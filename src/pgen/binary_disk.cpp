@@ -471,15 +471,15 @@ void MeshBlock::UserWorkInLoop(void)
         u_m2 = u_d*w_vy;
 
         // apply extremely short cooling
-        if (NON_BAROTROPIC_EOS){
-          Real pres0 = u_d*PoverR(rad,phi,z);
-          w_p = pres0;
-          w_p = (w_p > pfloor) ?  w_p : pfloor;
-          Real di = 1.0/u_d;
-          Real gmi = 1.0/(gamma_gas-1.0);
-          Real ke = 0.5*di*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3));
-          u_e = w_p*gmi+ke;
-        }
+        //if (NON_BAROTROPIC_EOS){
+        //  Real pres0 = u_d*PoverR(rad,phi,z);
+        //  w_p = pres0;
+        //  w_p = (w_p > pfloor) ?  w_p : pfloor;
+        //  Real di = 1.0/u_d;
+        //  Real gmi = 1.0/(gamma_gas-1.0);
+        //  Real ke = 0.5*di*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3));
+        //  u_e = w_p*gmi+ke;
+        //}
 
       }
     }
