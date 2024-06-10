@@ -42,6 +42,8 @@ class ChemNetwork : public NetworkWrapper {
   PassiveScalars *pmy_spec_;
   MeshBlock *pmy_mb_;
 
+  Real GetKappa(const Real temp); //opacity from dust per gas surface density
+
   //variables updated at InitializeNextStep from hydro variable
   Real sigma_;     // surface density in code units
   Real rdisk_;     // circumbinary disk radius in code units

@@ -54,14 +54,14 @@ ChemNetwork::~ChemNetwork() {
 
 void ChemNetwork::InitializeNextStep(const int k, const int j, const int i) {
   //TODO(Munan Gong): we need to change this likely
-  //Real rho, rho_floor;
+  Real rho, rho_floor;
   // density
-  //rho = pmy_mb_->phydro->w(IDN, k, j, i);
+  rho = pmy_mb_->phydro->w(IDN, k, j, i);
   // apply density floor
-  //rho_floor = pmy_mb_->peos->GetDensityFloor();
-  //rho = (rho > rho_floor) ?  rho : rho_floor;
-  // hydrogen atom number density
-  //nH_ =  rho;
+  rho_floor = pmy_mb_->peos->GetDensityFloor();
+  rho = (rho > rho_floor) ?  rho : rho_floor;
+  // 2D density -> surface density
+  sigma_ =  rho;
   return;
 }
 
@@ -106,4 +106,27 @@ Real ChemNetwork::Edot(const Real t, const Real *y, const Real ED) {
   //              * pmy_mb_->pmy_mesh->punit->code_time_cgs;
   //return dEDdt;
   return 0;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn Real GetKappa(const Real temp)
+//! \brief opacity from dust per gas surface density
+//!
+//! input:
+//!   temp: dust temperature in Kelvin
+//! output:
+//!   kappa: opacity from dust per gas surface density, in cm2/g
+
+Real ChemNetwork::GetKappa(const Real temp) {
+  Real kappa = 0.;
+  const Real temp_sub = 1500. //dust sublimation temperature in K
+  if (temp > temp_sub) {
+    return 0.;
+  }
+  if (temp < 150.) {
+    kappa = 2.0e-4 * temp*temp;
+  } else {
+    kappa = 4.5;
+  }
+  return kappa;
 }
