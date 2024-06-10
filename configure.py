@@ -206,7 +206,7 @@ parser.add_argument('--fftw_path',
 # --chemistry argument
 parser.add_argument('--chemistry',
                     default=None,
-                    choices=["gow17", "H2", "kida", "G14Sod"],
+                    choices=["gow17", "H2", "kida", "G14Sod", "binary_cooling"],
                     help='select chemical network')
 
 # --kida_rates argument
@@ -721,6 +721,8 @@ if args['chemistry'] is not None:
         definitions['NUMBER_CHEMICAL_SPECIES'] = '2'
     elif args['chemistry'] == "G14Sod":
         definitions['NUMBER_CHEMICAL_SPECIES'] = '8'
+    elif args['chemistry'] == "binary_cooling":
+        definitions['NUMBER_CHEMICAL_SPECIES'] = '1'
 else:
     definitions['CHEMISTRY_ENABLED'] = '0'
     definitions['NUMBER_CHEMICAL_SPECIES'] = '0'

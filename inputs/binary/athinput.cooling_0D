@@ -1,0 +1,70 @@
+<comment>
+problem   = Read C. G. Kim's MHD_32pc vtk output, single file.
+reference =
+configure = --prob=cooling_test_0D --chemistry=binary_cooling --eos=adiabatic --chem_ode_solver=cvode \
+--cvode_path=$CVODE_PATH --cxx=g++
+
+<job>
+problem_id = cooling_0D   # problem ID: basename of output filenames
+
+<output1>
+file_type  = hst       # vtk data dump
+dt         = 0.05      # time increment between outputs
+
+#<output2>
+#file_type  = vtk       # vtk data dump
+#variable   = prim      # variables to be output
+#dt         = 10        # time increment between outputs
+
+<time>
+cfl_number = 0.3       # The Courant, Friedrichs, & Lewy (CFL) Number
+nlim       = 10000     # cycle limit
+tlim       = 20        # time limit
+integrator = rk2
+xorder     = 2
+
+<mesh>
+nx1        = 4         # Number of zones in X1-direction
+x1min      = -0.5      # minimum value of X1
+x1max      = 0.5       # maximum value of X1
+ix1_bc     = periodic  # ner-X1 boundary flag
+ox1_bc     = periodic  # outer-X1 boundary flag
+
+nx2        = 4         # Number of zones in X2-direction
+x2min      = -0.5      # minimum value of X2
+x2max      = 0.5       # maximum value of X2
+ix2_bc     = periodic  # inner-X2 boundary flag
+ox2_bc     = periodic  # outer-X2 boundary flag
+
+nx3        = 1         # Number of zones in X3-direction
+x3min      = -0.5      # minimum value of X3
+x3max      = 0.5       # maximum value of X3
+ix3_bc     = periodic  # inner-X3 boundary flag
+ox3_bc     = periodic  # outer-X3 boundary flag
+
+<meshblock>
+nx1        =    4
+nx2        =    4
+nx3        =    1
+
+<hydro>
+gamma           =   1.4        # gamma = C_p/C_v
+iso_sound_speed =   0.179849   # initial isothermal sound speed, corresponding to T0=400K
+sfloor          =   0          # passive scalar floor
+active          =   fixed      # post-processing
+
+<problem>
+sigma0         = 1             #initial (surface) density
+muH            = 2.3           #initial x-velocity
+
+<chemistry>
+reltol     = 1.0e-15     #relative tolerance, default 1.0e-2
+abstol     = 1.0e-20     #absolute tolerance, default 1.0e-12
+user_jac   = false       #flag for whether use user provided Jacobian. default false/0
+maxsteps   = 100000      #maximum number of steps in one integration. default 10000
+
+<units>
+unit_system  = custom
+mass_cgs     = 1.43233e+32
+length_cgs   = 1.19680e+15
+time_cgs     = 1.79696e+09
