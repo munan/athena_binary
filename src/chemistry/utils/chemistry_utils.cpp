@@ -50,4 +50,18 @@ namespace ChemistryUtility {
     }
   }
 
+  //--------------------------------------------------------------------------------------
+  //! \fn int Real GetViscosityBinaryDisk(const Real alpha_vis)
+  //! \brief calculate viscosity for binary disk project
+  //! input:
+  //!  alpha_vis: alpha parameter for viscosity
+  //!  omega_orb: orbital frequency in cgs
+  //! output:
+  //!  nu: visocisity in cgs
+  Real GetViscosityBinaryDisk(const Real alpha_vis, const Real omega_orb) {
+    const Real cs_vis_ = 59891.04; //ficudial sound speed for calculating viscosity. 100 K, muH=2.3
+    const Real nu = alpha_vis * SQR(cs_vis_) / omega_orb;
+    return nu;
+  }
+
 } // namespace ChemistryUtility

@@ -22,6 +22,7 @@ namespace Constants {
 static const Real grav_const_cgs       = 6.67259e-8;
 static const Real solar_mass_cgs       = 1.9891e+33;
 static const Real solar_lum_cgs        = 3.8268e+33;
+static const Real solar_radius_cgs     = 6.9599e+10;
 static const Real yr_cgs               = 3.155815e+7;
 static const Real million_yr_cgs       = 3.155815e+13;
 static const Real pc_cgs               = 3.085678e+18;
@@ -30,6 +31,7 @@ static const Real km_s_cgs             = 1.0e+5;
 static const Real hydrogen_mass_cgs    = 1.6733e-24;
 static const Real radiation_aconst_cgs = 7.5646e-15;
 static const Real k_boltzmann_cgs      = 1.380658e-16;
+static const Real stefan_boltzmann_cgs = 5.6704e-05;
 static const Real speed_of_light_cgs   = 2.99792458e+10;
 static const Real echarge_cgs          = 4.80320427e-10;
 static const Real kelvin_cgs           = 1;

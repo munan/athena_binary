@@ -44,13 +44,21 @@ class ChemNetwork : public NetworkWrapper {
 
   Real GetKappa(const Real temp); //opacity from dust per gas surface density
 
+  //input variables
+  Real gm1_;  //adiabatic index (gamma - 1)
+  Real muH_;  //mean molecular weight per hydrogen nuclei
+  Real rstar_rsun_;     //stellar radius in solar radius
+  Real rstar_;      //stellar radius in code units
+  Real alpha_vis_;      //alpha for calculating viscosity
+  Real nu_;   //viscosity in cgs, calculated from alpha_vis
+  Real f_lacc_; // efficiency for accretion luminosity
+
   //variables updated at InitializeNextStep from hydro variable
   Real sigma_;     // surface density in code units
-  Real rdisk_;     // circumbinary disk radius in code units
 
-  //variables read from input files
-  Real mbinary_msun_;   //total binary mass in solar mass
-  Real rstar_rsun_;     //stellar radius in solar radius
-  Real alpha_vis_;      //alpha for calculating viscosity
+  //variables for 0D cooling
+  //TODO(Munan Gong): need to be modified for 2D disk simulation
+  Real rdisk_;     // circumbinary disk radius in code units
+  Real mdot_cgs_;  // mass accretion rate in cgs
 };
 #endif // CHEMISTRY_NETWORK_BINARY_COOLING_HPP_

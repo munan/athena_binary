@@ -24,5 +24,6 @@ namespace ChemistryUtility {
   const Real mCO = 4.68e-23;
   int FindStrIndex(const std::string *str_arr, const int len,
                    const std::string name);
+  Real GetViscosityBinaryDisk(const Real alpha_vis, const Real omega_orb);
 } // namespace ChemistryUtility
 #endif // CHEMISTRY_UTILS_CHEMISTRY_UTILS_HPP_
