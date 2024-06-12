@@ -39,6 +39,7 @@ const std::array<std::string, NSPECIES> ChemNetwork::species_names = {"spec0"};
 ChemNetwork::ChemNetwork(MeshBlock *pmb, ParameterInput *pin) {
   pmy_spec_ = pmb->pscalars;
   pmy_mb_ = pmb;
+  cfl_cool = pin->GetReal("chemistry", "cfl_cool");
   gm1_ = pin->GetReal("hydro", "gamma") - 1.;
   muH_ = pin->GetReal("problem", "muH");
   rstar_rsun_ =  pin->GetReal("problem", "rstar_rsun");
@@ -162,4 +163,14 @@ Real ChemNetwork::GetKappa(const Real temp) {
     kappa = 4.5;
   }
   return kappa;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn static Real CoolingTimeStep(MeshBlock *pmb)
+//! \brief calculate cooling timestep for constraining timestep
+//!   return cooling timestep in code units
+Real ChemNetwork::CoolingTimeStep(MeshBlock *pmb) {
+  Real real_max = std::numeric_limits<Real>::max();
+  Real min_dt = real_max;
+  return min_dt;
 }
