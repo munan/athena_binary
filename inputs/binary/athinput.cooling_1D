@@ -1,36 +1,32 @@
 <comment>
-problem   = Cooling test 0D for binary disk
+problem   = Cooling test 1D for binary disk
 reference =
-configure = --prob=cooling_test_0D --chemistry=binary_cooling --eos=adiabatic --chem_ode_solver=cvode \
+configure = --prob=cooling_test_1D --chemistry=binary_cooling --eos=adiabatic --chem_ode_solver=cvode \
 --cvode_path=$CVODE_PATH --cxx=g++
 
 <job>
 problem_id = cooling_0D   # problem ID: basename of output filenames
 
 <output1>
-file_type  = hst       # vtk data dump
-dt         = 0.05      # time increment between outputs
-
-#<output2>
-#file_type  = vtk       # vtk data dump
-#variable   = prim      # variables to be output
-#dt         = 10        # time increment between outputs
+file_type  = vtk       # vtk data dump
+variable   = prim      # variables to be output
+dt         = 0.01      # time increment between outputs
 
 <time>
 cfl_number = 0.3       # The Courant, Friedrichs, & Lewy (CFL) Number
-nlim       = 100000    # cycle limit
-tlim       = 200       # time limit
+nlim       = -1        # cycle limit
+tlim       = 1         # time limit
 integrator = rk2
 xorder     = 2
 
 <mesh>
-nx1        = 4         # Number of zones in X1-direction
-x1min      = -0.5      # minimum value of X1
-x1max      = 0.5       # maximum value of X1
-ix1_bc     = periodic  # ner-X1 boundary flag
-ox1_bc     = periodic  # outer-X1 boundary flag
+nx1        = 32        # Number of zones in X1-direction
+x1min      = -5        # minimum value of X1
+x1max      = 5         # maximum value of X1
+ix1_bc     = outflow   # ner-X1 boundary flag
+ox1_bc     = outflow   # outer-X1 boundary flag
 
-nx2        = 4         # Number of zones in X2-direction
+nx2        = 1         # Number of zones in X2-direction
 x2min      = -0.5      # minimum value of X2
 x2max      = 0.5       # maximum value of X2
 ix2_bc     = periodic  # inner-X2 boundary flag
@@ -43,18 +39,19 @@ ix3_bc     = periodic  # inner-X3 boundary flag
 ox3_bc     = periodic  # outer-X3 boundary flag
 
 <meshblock>
-nx1        =    4
-nx2        =    4
+nx1        =    32
+nx2        =    1
 nx3        =    1
 
 <hydro>
 gamma           =   1.4        # gamma = C_p/C_v
 iso_sound_speed =   0.179849   # initial isothermal sound speed, corresponding to T0=400K
 sfloor          =   0          # passive scalar floor
-active          =   fixed      # post-processing
 
 <problem>
 sigma0         = 1             # initial (surface) density
+vx_kms_p       = 0.            # initial velocity at x > 0, in km/s
+vx_kms_m       = 3.            # initial velocity at x < 0, in km/s
 muH            = 2.3           # initial x-velocity
 rstar_rsun     = 2.5           # stellar radius in solar radius
 alpha_vis      = 0.11          # alpha viscosity
