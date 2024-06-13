@@ -170,7 +170,38 @@ Real ChemNetwork::GetKappa(const Real temp) {
 //! \brief calculate cooling timestep for constraining timestep
 //!   return cooling timestep in code units
 Real ChemNetwork::CoolingTimeStep(MeshBlock *pmb) {
-  Real real_max = std::numeric_limits<Real>::max();
+  const Real real_max = std::numeric_limits<Real>::max();
+  const Real small_ = 1024 * std::numeric_limits<float>::min();
   Real min_dt = real_max;
+  const Real cfl_cool = pmb->pscalars->chemnet.cfl_cool;
+  const Real tunit_cgs = pmb->punit->code_time_cgs;
+  // conserved variables
+  AthenaArray<Real> &u = pmy_block_->phydro->u;
+  AthenaArray<Real> &bcc = pmy_block_->pfield->bcc;
+
+  if (NON_BAROTROPIC_EOS) {
+    for (int k=pmb->ks; k<=pmb->ke; ++k) {
+      for (int j=pmb->js; j<=pmb->je; ++j) {
+        for (int i=pmb->is; i<=pmb->ie; ++i) {
+          Real E = 0.;
+          Real Edot = 0.;
+          Real dt = 0.;
+          // assign internal energy
+          E = u(IEN,k,j,i)
+            - 0.5*( SQR(u(IM1,k,j,i)) + SQR(u(IM2,k,j,i)) + SQR(u(IM3,k,j,i))
+                )/u(IDN,k,j,i);
+          if (MAGNETIC_FIELDS_ENABLED) {
+            E -= 0.5*(
+                SQR(bcc(IB1,k,j,i)) + SQR(bcc(IB2,k,j,i)) + SQR(bcc(IB3,k,j,i)) );
+          }
+          // calculate heating and cooling rates
+          // TODO (Munan Gong): get time and y
+          Edot = pmy_spec_->chemnet.Edot(time, y, E);
+          dt = std::abs(E/(Edot+small_));// calculate your own time step here
+          min_dt = std::min(min_dt, dt);
+        }
+      }
+    }
+  }
   return min_dt;
 }
