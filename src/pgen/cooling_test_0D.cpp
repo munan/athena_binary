@@ -41,6 +41,9 @@ Real muH; //mean molecular weight per hydrogen nuclei
 //! \fn void Mesh::InitUserMeshData(ParameterInput *pin)
 //========================================================================================
 void Mesh::InitUserMeshData(ParameterInput *pin) {
+  //mean molecular weight per hydrogen nuclei
+  muH = pin->GetReal("problem", "muH");
+
   AllocateUserHistoryOutput(1);
   EnrollUserHistoryOutput(0, HistoryT, "T");
   return;
@@ -52,9 +55,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 //======================================================================================
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin) {
-  //mean molecular weight per hydrogen nuclei
-  muH = pin->GetReal("problem", "muH");
-
   // read initial gas surface density and sound speed
   const Real sigma0 = pin->GetReal("problem", "sigma0");
   const Real iso_cs = pin->GetReal("hydro", "iso_sound_speed");

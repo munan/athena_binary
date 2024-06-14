@@ -32,6 +32,24 @@
 #include "../mesh/mesh.hpp"
 #include "../parameter_input.hpp"
 #include "../scalars/scalars.hpp"
+namespace {
+Real CoolingTimeStep(MeshBlock *pmb);
+Real cfl_cool; //cfl number for cooling time
+} // namespace
+
+//========================================================================================
+//! \fn void Mesh::InitUserMeshData(ParameterInput *pin)
+//! \brief Function to initialize problem-specific data in mesh class.  Can also be used
+//! to initialize variables which are global to (and therefore can be passed to) other
+//! functions in this file.  Called in Mesh constructor.
+//========================================================================================
+void Mesh::InitUserMeshData(ParameterInput *pin) {
+  cfl_cool = pin->GetReal("chemistry", "cfl_cool");
+  // Enroll timestep so that dt <= min t_cool
+  if (CHEMISTRY_ENABLED) {
+    EnrollUserTimeStepFunction(CoolingTimeStep);
+  }
+}
 
 //======================================================================================
 //! \fn void MeshBlock::ProblemGenerator(ParameterInput *pin)
@@ -98,3 +116,49 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   }
   return;
 }
+
+namespace {
+
+//----------------------------------------------------------------------------------------
+//! \fn Real CoolingTimeStep(MeshBlock *pmb)
+//! \brief calculate cooling timestep for constraining timestep
+//!   return cooling timestep in code units
+Real CoolingTimeStep(MeshBlock *pmb) {
+  const Real real_max = std::numeric_limits<Real>::max();
+  const Real small_ = 1024 * std::numeric_limits<float>::min();
+  Real min_dt = real_max;
+  Real time = pmb->pmy_mesh->time;
+  Real y[1] = {0.};
+  // primative variables
+  AthenaArray<Real> &w = pmb->phydro->w;
+  // adiabatic index - 1
+  const Real gm1 = pmb->peos->GetGamma() - 1.;
+
+  if (NON_BAROTROPIC_EOS) {
+    for (int k=pmb->ks; k<=pmb->ke; ++k) {
+      for (int j=pmb->js; j<=pmb->je; ++j) {
+        for (int i=pmb->is; i<=pmb->ie; ++i) {
+          Real E = 0.;
+          Real Edot = 0.;
+          Real dt = 0.;
+          // initialize
+          pmb->pscalars->chemnet.InitializeNextStep(k, j, i);
+          // assign internal energy
+          E = std::max( w(IPR,k,j,i)/gm1, pmb->peos->GetPressureFloor()/gm1 );
+          // calculate heating and cooling rates
+          Edot = pmb->pscalars->chemnet.Edot(time, y, E);
+          dt = cfl_cool * std::abs(E)/(std::abs(Edot)+small_);// calculate your own time step here
+          //TODO(Munan Gong): debug output
+          std::cout << "i=" << i << ", coolint dt = " << dt << std::endl;
+          std::cout << "E=" << E << ", Edot=" << Edot << std::endl;
+          min_dt = std::min(min_dt, dt);
+        }
+      }
+    }
+  }
+  std::cout << "cfl_cool = " << cfl_cool << std::endl;
+  std::cout << "cooling min_dt = " << min_dt << std::endl;
+  return min_dt;
+}
+
+} // namespace

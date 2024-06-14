@@ -38,12 +38,6 @@ class ChemNetwork : public NetworkWrapper {
   void RHS(const Real t, const Real *y, const Real ED, Real *ydot);
   Real Edot(const Real t, const Real *y, const Real ED);
 
-  //calculate cooling timestep
-  static Real CoolingTimeStep(MeshBlock *pmb);
-
-  //cfl number for cooling time
-  Real cfl_cool;
-
  private:
   PassiveScalars *pmy_spec_;
   MeshBlock *pmy_mb_;
