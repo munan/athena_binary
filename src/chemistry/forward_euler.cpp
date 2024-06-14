@@ -203,12 +203,12 @@ Real GetChemTime(const Real *y, const Real *ydot, const Real E, const Real Edot)
     yf[ispec] = std::max(y[ispec], yfloor);
   }
   // calculate chemistry timescale
-  Real tchem = std::abs( yf[0]/(ydot[0] + small_) );
+  Real tchem = std::abs(yf[0]) / ( std::abs(ydot[0]) + small_ ) ;
   for (int ispec=1; ispec<NSPECIES; ispec++) {
-    tchem = std::min( tchem, std::abs(yf[ispec]/(ydot[ispec]+small_)) );
+    tchem = std::min( tchem, std::abs(yf[ispec]) / ( std::abs(ydot[ispec])+small_ ) );
   }
   if (NON_BAROTROPIC_EOS) {
-    tchem = std::min( tchem, std::abs(E/(Edot+small_)) );
+    tchem = std::min( tchem, std::abs(E) / ( std::abs(Edot)+small_ ) );
   }
   return tchem;
 }
