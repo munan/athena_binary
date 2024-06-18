@@ -148,16 +148,11 @@ Real CoolingTimeStep(MeshBlock *pmb) {
           // calculate heating and cooling rates
           Edot = pmb->pscalars->chemnet.Edot(time, y, E);
           dt = cfl_cool * std::abs(E)/(std::abs(Edot)+small_);// calculate your own time step here
-          //TODO(Munan Gong): debug output
-          std::cout << "i=" << i << ", coolint dt = " << dt << std::endl;
-          std::cout << "E=" << E << ", Edot=" << Edot << std::endl;
           min_dt = std::min(min_dt, dt);
         }
       }
     }
   }
-  std::cout << "cfl_cool = " << cfl_cool << std::endl;
-  std::cout << "cooling min_dt = " << min_dt << std::endl;
   return min_dt;
 }
 
