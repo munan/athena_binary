@@ -426,9 +426,9 @@ void MeshBlock::UserWorkInLoop(void)
             //if (radp <= rsink) accm1 += (u_d0-u_d)*vol;
             //else accm2 += (u_d0-u_d)*vol;
             if (radp <= rsink) {
-              accm1 += (u_d0-u_d)*vol/dt;
+              accm1 = (u_d0-u_d)*vol/dt;
             } else {
-              accm2 += (u_d0-u_d)*vol/dt;
+              accm2 = (u_d0-u_d)*vol/dt;
             }
           }
         }
