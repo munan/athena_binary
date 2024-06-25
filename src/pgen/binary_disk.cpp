@@ -59,7 +59,7 @@ void Binary(MeshBlock *pmb, const Real time, const Real dt,
             const AthenaArray<Real> &bcc, AthenaArray<Real> &cons,
             AthenaArray<Real> &cons_scalar);
 //user defined hst output
-//static Real hst_accm(MeshBlock *pmb, int iout);
+static Real hst_accm(MeshBlock *pmb, int iout);
 
 // problem parameters which are useful to make global to this file
 static Real semia,ecc,qrat,mu,incli,argp;
@@ -77,14 +77,6 @@ static Real dueps=1e-6;
 static Real rsep,uanorm,fanorm;
 //real-time binary postion in cartesian
 static Real x1s,x2s,x3s,x1p,x2p,x3p;
-
-//num of shells for history output
-static int ihst1d;
-static int nvar=14; //output five major variables
-static Real hst1d_tstart;
-static int ncbd,ncsd1,ncsd2;
-
-
 
 // debug for binary orbit
 static FILE * pf;
@@ -178,14 +170,24 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   EnrollUserBoundaryFunction(BoundaryFace::inner_x3, DiodeInnerX3);
   EnrollUserBoundaryFunction(BoundaryFace::outer_x3, DiodeOuterX3);
 
-//  AllocateUserHistoryOutput(2);
-//  EnrollUserHistoryOutput(0, hst_accm, "accm1");
-//  EnrollUserHistoryOutput(1, hst_accm, "accm2");
+  AllocateUserHistoryOutput(2);
+  EnrollUserHistoryOutput(0, hst_accm, "accm1");
+  EnrollUserHistoryOutput(1, hst_accm, "accm2");
 
 
   // debug binary orbit
   pf = fopen ("binary_orbit.tab","w");
   tstart = torb; //first dump
+  return;
+}
+
+//========================================================================================
+//! \fn void void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
+//! \brief Allocate accretion rates array
+//========================================================================================
+void MeshBlock::InitUserMeshBlockData(ParameterInput *pin) {
+  AllocateRealUserMeshBlockDataField(1);
+  ruser_meshblock_data[0].NewAthenaArray(2);
   return;
 }
 
@@ -329,14 +331,6 @@ static Real RampFunc(const Real rad, const Real phi, const Real z,
 void MeshBlock::UserWorkInLoop(void)
 {
 
-  // Clear hist data after previous loop
-  if ((ihst1d==1) && (pmy_mesh->time>=hst1d_tstart)) {
-    for(int n=0; n<nvar; n++) {
-      for(int i=0; i<ncbd;  i++) ruser_meshblock_data[4](n,i)=0;
-      for(int i=0; i<ncsd1; i++) ruser_meshblock_data[5](n,i)=0;
-      for(int i=0; i<ncsd2; i++) ruser_meshblock_data[6](n,i)=0;
-    }
-  }
   // estimate the velocity of the binary needed for calc the hist data
   Real sini = sin(incli);
   Real cosi = cos(incli);
@@ -425,15 +419,18 @@ void MeshBlock::UserWorkInLoop(void)
           w_vy = u_m2*di;
           w_vz = u_m3*di;
           // store the accretion rate
-          //if ((i<=ie && i>=is) && (j<=je && j>=js) && (k<=ke && k>=ks)){
-          //  Real vol = pcoord->GetCellVolume(k,j,i);
-          //  Real& accm1 = ruser_meshblock_data[0](0);
-          //  Real& accm2 = ruser_meshblock_data[0](1);
-          //  if (radp <= rsink) accm1 += (u_d0-u_d)*vol;
-          //  else accm2 += (u_d0-u_d)*vol;
-          //  //if (radp <= rsink) accm1 += (u_d0-u_d)*vol/dt;
-          //  //else accm2 += (u_d0-u_d)*vol/dt;
-          //}
+          if ((i<=ie && i>=is) && (j<=je && j>=js) && (k<=ke && k>=ks)){
+            Real vol = pcoord->GetCellVolume(k,j,i);
+            Real& accm1 = ruser_meshblock_data[0](0);
+            Real& accm2 = ruser_meshblock_data[0](1);
+            //if (radp <= rsink) accm1 += (u_d0-u_d)*vol;
+            //else accm2 += (u_d0-u_d)*vol;
+            if (radp <= rsink) {
+              accm1 += (u_d0-u_d)*vol/dt;
+            } else {
+              accm2 += (u_d0-u_d)*vol/dt;
+            }
+          }
         }
         // apply wave-killing zone within [rbuf1,rbuf2] to quench m=4 mode
         if (rad >= rbuf1) {
@@ -450,14 +447,15 @@ void MeshBlock::UserWorkInLoop(void)
           w_vy = u_m2*di;
           w_vz = u_m3*di;
 
-          //if (NON_BAROTROPIC_EOS){
-          //  Real p_over_r = PoverR(rad,phi,z);
-          //  Real pres0 = p_over_r*den0;
-          //  w_p -= dt*(w_p-pres0)*ramp;
-          //  w_p = (w_p > pfloor) ?  w_p : pfloor;
-          //  Real ke = 0.5*di*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3));
-          //  u_e = w_p/(gamma_gas-1.0)+ke;
-          //}
+          // Extremely short cooling
+          // if (NON_BAROTROPIC_EOS){
+          //   Real p_over_r = PoverR(rad,phi,z);
+          //   Real pres0 = p_over_r*den0;
+          //   w_p -= dt*(w_p-pres0)*ramp;
+          //   w_p = (w_p > pfloor) ?  w_p : pfloor;
+          //   Real ke = 0.5*di*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3));
+          //   u_e = w_p/(gamma_gas-1.0)+ke;
+          // }
         }
         // apply velocity cap
         u_d = (u_d > dfloor) ?  u_d : dfloor;
@@ -483,183 +481,6 @@ void MeshBlock::UserWorkInLoop(void)
 
       }
     }
-  }
-  if ((ihst1d==1) && (pmy_mesh->time>=hst1d_tstart)) {
-    for(int k=ks; k<=ke; k++) {
-      for(int j=js; j<=je; j++) {
-        for(int i=is; i<=ie; i++) {
-          // calculate the shell integrated binary torque,tilt angle, and precession angle
-          //CalculateTorque();
-          Real x1 = pcoord->x1v(i);
-          Real x2 = pcoord->x2v(j);
-          Real x3 = pcoord->x3v(k);
-          Real radp = sqrt(SQR(x1-x1p)+SQR(x2-x2p)+SQR(x3-x3p));
-          Real rads = sqrt(SQR(x1-x1s)+SQR(x2-x2s)+SQR(x3-x3s));
-          Real rad, phi, z;
-          GetCylCoord(pcoord,rad,phi,z,i,j,k);
-
-          Real& u_d  = phydro->u(IDN,k,j,i);
-          Real& u_m1 = phydro->u(IM1,k,j,i);
-          Real& u_m2 = phydro->u(IM2,k,j,i);
-          Real& u_m3 = phydro->u(IM3,k,j,i);
-          Real& u_e  = phydro->u(IEN,k,j,i);
-
-          Real& w_d  = phydro->w(IDN,k,j,i);
-          Real& w_vx = phydro->w(IVX,k,j,i);
-          Real& w_vy = phydro->w(IVY,k,j,i);
-          Real& w_vz = phydro->w(IVZ,k,j,i);
-          Real& w_p  = phydro->w(IEN,k,j,i);
-
-          Real dt = pmy_mesh->dt;
-
-          AthenaArray<Real>& rcbd = ruser_meshblock_data[1];
-          AthenaArray<Real>& rcsd1 = ruser_meshblock_data[2];
-          AthenaArray<Real>& rcsd2 = ruser_meshblock_data[3];
-          AthenaArray<Real>& data_cbd = ruser_meshblock_data[4];
-          AthenaArray<Real>& data_csd1 = ruser_meshblock_data[5];
-          AthenaArray<Real>& data_csd2 = ruser_meshblock_data[6];
-          Real rsph = sqrt(SQR(x1)+SQR(x2)+SQR(x3));
-
-          // define a pointer to hydro diffusion class
-          HydroDiffusion *phdif = &phydro->hdif;
-          // viscous stress tensor T_{ij}. For example,
-          //      x1flx(IM1,k,j,i) = T_xx (k,j,i)
-          //      x1flx(IM2,k,j,i) = T_xy (k,j,i)
-          //      x1flx(IM3,k,j,i) = T_xz (k,j,i)
-          //      x2flx(IM1,k,j,i) = T_yx (k,j,i)
-          AthenaArray<Real> &x1flx=phdif->visflx[X1DIR]; //x1flx([IM1,IM2,IM3],k,j,i)
-          AthenaArray<Real> &x2flx=phdif->visflx[X2DIR]; //x2flx([IM1,IM2,IM3],k,j,i)
-          AthenaArray<Real> &x3flx=phdif->visflx[X3DIR]; //x3flx([IM1,IM2,IM3],k,j,i)
-
-          for (int n=0; n<ncbd; n++) {
-            Real rc = rcbd(0,n);
-            Real rl = rc-0.5*rcbd(1,n);
-            Real rr = rc+0.5*rcbd(1,n);
-            if (rsph>=rl && rsph<rr) {
-              Real a1 = (1.0-mu)*rsep;
-              Real a2 = mu*rsep;
-              Real phiprime = atan2(x2*cos(incli)-x3*sin(incli),x1);
-              Real sinphi = sin(fanorm+argp-phiprime);
-              Real vol = pcoord->GetCellVolume(k,j,i);
-              Real rsphp = pow(SQR(x1-x1p)+SQR(x2-x2p)+SQR(x3-x3p)+SQR(rsoft),1.5); //r1^3
-              Real rsphs = pow(SQR(x1-x1s)+SQR(x2-x2s)+SQR(x3-x3s)+SQR(rsoft),1.5); //r2^3
-              Real rsph_p = sqrt(SQR(x1-x1p)+SQR(x2-x2p)+SQR(x3-x3p)+SQR(rsoft)); //r1
-              Real rsph_s = sqrt(SQR(x1-x1s)+SQR(x2-x2s)+SQR(x3-x3s)+SQR(rsoft)); //r2
-              // Z-TORQUE AVERAGE OVER SHELL WIDTH
-              Real dphidx = 0.5*((x1-x1p)/rsphp+(x1-x1s)/rsphs);
-              Real dphidy = 0.5*((x2-x2p)/rsphp+(x2-x2s)/rsphs);
-              Real dphidz = 0.5*((x3-x3p)/rsphp+(x3-x3s)/rsphs);
-              data_cbd(0,n) += u_d*vol/rcbd(1,n)*(x1*dphidy-x2*dphidx);
-              // MDOT AVERAGE OVER SHELL WIDTH
-              Real vrad = (x1*w_vx+x2*w_vy+x3*w_vz)/rsph;
-              data_cbd(1,n) += u_d*vrad*vol/rcbd(1,n);
-              // SHELL INTEGRATED ANGULAR MOMENTUM \rho r x p
-              Real rxp1 = x2*w_vz-x3*w_vy;
-              Real rxp2 = x1*w_vz-x3*w_vx;
-              Real rxp3 = x1*w_vy-x2*w_vx;
-              data_cbd(2,n) += u_d*rxp1*vol;
-              data_cbd(3,n) += u_d*rxp2*vol;
-              data_cbd(4,n) += u_d*rxp3*vol;
-              // SHELL INTEGRATED SURFACE DENSITY (sigma*r*dphi)
-              data_cbd(5,n) += u_d*vol/rcbd(1,n);
-              // X, Y GRAV TORQUE
-              data_cbd(6,n) += u_d*vol/rcbd(1,n)*(x2*dphidz-x3*dphidy);
-              data_cbd(7,n) += u_d*vol/rcbd(1,n)*(x3*dphidx-x1*dphidz);
-              // TORQUE FROM ADVECTION (X,Y,Z)
-              data_cbd(8,n) += u_d*vol/rcbd(1,n)/rsph*(x3*w_vy-x2*w_vz)*(x1*w_vx+x2*w_vy+x3*w_vz);
-              data_cbd(9,n) += u_d*vol/rcbd(1,n)/rsph*(x1*w_vz-x3*w_vx)*(x1*w_vx+x2*w_vy+x3*w_vz);
-              data_cbd(10,n) += u_d*vol/rcbd(1,n)/rsph*(x2*w_vx-x1*w_vy)*(x1*w_vx+x2*w_vy+x3*w_vz);
-              // VISCOUS TORQUE (X,Y,Z)
-              Real TdotRhat_x = (x1flx(IM1,k,j,i)*x1+x1flx(IM2,k,j,i)*x2+x1flx(IM3,k,j,i)*x3)/rsph;
-              Real TdotRhat_y = (x2flx(IM1,k,j,i)*x1+x2flx(IM2,k,j,i)*x2+x2flx(IM3,k,j,i)*x3)/rsph;
-              Real TdotRhat_z = (x3flx(IM1,k,j,i)*x1+x3flx(IM2,k,j,i)*x2+x3flx(IM3,k,j,i)*x3)/rsph;
-              data_cbd(11,n) += vol/rcbd(1,n)*(x3*TdotRhat_y-x2*TdotRhat_z);
-              data_cbd(12,n) += vol/rcbd(1,n)*(x1*TdotRhat_z-x3*TdotRhat_x);
-              data_cbd(13,n) += vol/rcbd(1,n)*(x2*TdotRhat_x-x1*TdotRhat_y);
-            }
-          }
-
-          for (int n=0; n<ncsd1; n++) {
-            Real rc = rcsd1(0,n);
-            Real rl = rc-0.5*rcsd1(1,n);
-            Real rr = rc+0.5*rcsd1(1,n);
-            if (radp>=rl && radp<rr) {
-              Real a1 = (1.0-mu)*rsep;
-              Real a2 = mu*rsep;
-              Real phiprime = atan2(x2*cos(incli)-x3*sin(incli),x1);
-              Real sinphi = sin(fanorm+argp-phiprime);
-              Real vol = pcoord->GetCellVolume(k,j,i);
-              Real rsphp = pow(SQR(x1-x1p)+SQR(x2-x2p)+SQR(x3-x3p)+SQR(rsoft),1.5); //r1^3
-              Real rsphs = pow(SQR(x1-x1s)+SQR(x2-x2s)+SQR(x3-x3s)+SQR(rsoft),1.5); //r2^3
-              // z-torque average over shell width
-              data_csd1(0,n) += u_d*rad*gm0*sinphi*(-mu*a1/rsphp+(1.0-mu)*a2/rsphs)*vol/rcsd1(1,n);
-              // mdot average over shell width
-              Real rrp = sqrt(SQR(x1-x1p)+SQR(x2-x2p)+SQR(x3-x3p));//\vec{r}-\vec{rp}
-              Real vrad = ((x1-x1p)*(w_vx-v1p)+(x2-x2p)*(w_vy-v2p)+(x3-x3p)*(w_vz-v3p))/rrp;
-              data_csd1(1,n) += u_d*vrad*vol/rcsd1(1,n);
-              // shell integrated angular momentum \rho r x p
-              Real rxp1 = (x2-x2p)*(w_vz-v3p)-(x3-x3p)*(w_vy-v2p);
-              Real rxp2 = (x1-x1p)*(w_vz-v3p)-(x3-x3p)*(w_vx-v1p);
-              Real rxp3 = (x1-x1p)*(w_vy-v2p)-(x2-x2p)*(w_vx-v1p);
-              data_csd1(2,n) += u_d*rxp1*vol;
-              data_csd1(3,n) += u_d*rxp2*vol;
-              data_csd1(4,n) += u_d*rxp3*vol;
-              // shell integrated surface density
-              data_csd1(5,n) += u_d*vol/rcsd1(1,n);
-              // others
-              data_csd1(6,n) += 1.0;
-              data_csd1(7,n) += 1.0;
-              data_csd1(8,n) += 1.0;
-              data_csd1(9,n) += 1.0;
-              data_csd1(10,n) += 1.0;
-              data_csd1(11,n) += 1.0;
-              data_csd1(12,n) += 1.0;
-              data_csd1(13,n) += 1.0;
-            }
-          }
-
-          for (int n=0; n<ncsd2; n++) {
-            Real rc = rcsd2(0,n);
-            Real rl = rc-0.5*rcsd2(1,n);
-            Real rr = rc+0.5*rcsd2(1,n);
-            if (rads>=rl && rads<rr) {
-              Real a1 = (1.0-mu)*rsep;
-              Real a2 = mu*rsep;
-              Real phiprime = atan2(x2*cos(incli)-x3*sin(incli),x1);
-              Real sinphi = sin(fanorm+argp-phiprime);
-              Real vol = pcoord->GetCellVolume(k,j,i);
-              Real rsphp = pow(SQR(x1-x1p)+SQR(x2-x2p)+SQR(x3-x3p)+SQR(rsoft),1.5); //r1^3
-              Real rsphs = pow(SQR(x1-x1s)+SQR(x2-x2s)+SQR(x3-x3s)+SQR(rsoft),1.5); //r2^3
-              // z-torque average over shell width
-              data_csd2(0,n) += u_d*rad*gm0*sinphi*(-mu*a1/rsphp+(1.0-mu)*a2/rsphs)*vol/rcsd2(1,n);
-              // mdot average over shell width
-              Real rrs = sqrt(SQR(x1-x1s)+SQR(x2-x2s)+SQR(x3-x3s));//\vec{r}-\vec{rs}
-              Real vrad = ((x1-x1s)*(w_vx-v1s)+(x2-x2s)*(w_vy-v2s)+(x3-x3s)*(w_vz-v3s))/rrs;
-              data_csd2(1,n) += u_d*vrad*vol/rcsd2(1,n);
-              // shell integrated angular momentum \rho r x p
-              Real rxp1 = (x2-x2s)*(w_vz-v3s)-(x3-x3s)*(w_vy-v2s);
-              Real rxp2 = (x1-x1s)*(w_vz-v3s)-(x3-x3s)*(w_vx-v1s);
-              Real rxp3 = (x1-x1s)*(w_vy-v2s)-(x2-x2s)*(w_vx-v1s);
-              data_csd2(2,n) += u_d*rxp1*vol;
-              data_csd2(3,n) += u_d*rxp2*vol;
-              data_csd2(4,n) += u_d*rxp3*vol;
-              // shell integrated surface density
-              data_csd2(5,n) += u_d*vol/rcsd2(1,n);
-              // others
-              data_csd2(6,n) += 1.0;
-              data_csd2(7,n) += 1.0;
-              data_csd2(8,n) += 1.0;
-              data_csd2(9,n) += 1.0;
-              data_csd2(10,n) += 1.0;
-              data_csd2(11,n) += 1.0;
-              data_csd2(12,n) += 1.0;
-              data_csd2(13,n) += 1.0;
-            }
-          }
-
-        }
-      }
-    } //end second loop - calc hst1d data
   }
 
 } //end UserWorkInLoop
@@ -811,12 +632,15 @@ void Cooling(MeshBlock *pmb, const Real time, const Real dt, const AthenaArray<R
   return;
 }
 
-//static Real hst_accm(MeshBlock *pmb, int iout)
-//{
-//  //std::cout <<"gid = "<< pmb->gid << " accm1= " << pmb->accm1 << " accm2= " << pmb->accm2 << std::endl;
-//  if (iout == 0) return pmb->ruser_meshblock_data[0](0);
-//  else return pmb->ruser_meshblock_data[0](1);
-//}
+static Real hst_accm(MeshBlock *pmb, int iout)
+{
+  //std::cout <<"gid = "<< pmb->gid << " accm1= " << pmb->accm1 << " accm2= " << pmb->accm2 << std::endl;
+  if (iout == 0) {
+    return pmb->ruser_meshblock_data[0](0);
+  } else {
+    return pmb->ruser_meshblock_data[0](1);
+  }
+}
 
 void DiodeInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &a,
      FaceField &b, Real time, Real dt,
@@ -869,12 +693,3 @@ void DiodeOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &a,
   return;
 }
 
-
-//// calc torque torqcbd as a function of rcbd
-//// [4] AthenaArray(4, ncbd) torq,mdot,beta,pres
-//// [5] AthenaArray(4, ncsd1) torq,mdot,beta,pres
-//// [6] AthenaArray(4, ncsd2) torq,mdot,beta,pres
-//void CalculateTorque()
-//{
-//
-//}
