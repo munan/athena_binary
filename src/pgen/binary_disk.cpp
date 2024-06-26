@@ -170,9 +170,13 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   EnrollUserBoundaryFunction(BoundaryFace::inner_x3, DiodeInnerX3);
   EnrollUserBoundaryFunction(BoundaryFace::outer_x3, DiodeOuterX3);
 
-  AllocateUserHistoryOutput(2);
+  AllocateUserHistoryOutput(4);
+  // accumulated accreted mass
   EnrollUserHistoryOutput(0, hst_accm, "accm1");
   EnrollUserHistoryOutput(1, hst_accm, "accm2");
+  // mass accretion rates
+  EnrollUserHistoryOutput(2, hst_accm, "accr1");
+  EnrollUserHistoryOutput(3, hst_accm, "accr2");
 
 
   // debug binary orbit
@@ -187,7 +191,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 //========================================================================================
 void MeshBlock::InitUserMeshBlockData(ParameterInput *pin) {
   AllocateRealUserMeshBlockDataField(1);
-  ruser_meshblock_data[0].NewAthenaArray(2);
+  ruser_meshblock_data[0].NewAthenaArray(4);
   return;
 }
 
@@ -374,6 +378,12 @@ void MeshBlock::UserWorkInLoop(void)
   //int ju = je;
   //int kl = ks;
   //int ku = ke;
+  Real& accm1 = ruser_meshblock_data[0](0);
+  Real& accm2 = ruser_meshblock_data[0](1);
+  Real& accr1 = ruser_meshblock_data[0](2);
+  Real& accr2 = ruser_meshblock_data[0](3);
+  accr1 = 0.;
+  accr2 = 0.;
   for(int k=kl; k<=ku; k++) {
     for(int j=jl; j<=ju; j++) {
       for(int i=il; i<=iu; i++) {
@@ -421,14 +431,12 @@ void MeshBlock::UserWorkInLoop(void)
           // store the accretion rate
           if ((i<=ie && i>=is) && (j<=je && j>=js) && (k<=ke && k>=ks)){
             Real vol = pcoord->GetCellVolume(k,j,i);
-            Real& accm1 = ruser_meshblock_data[0](0);
-            Real& accm2 = ruser_meshblock_data[0](1);
-            //if (radp <= rsink) accm1 += (u_d0-u_d)*vol;
-            //else accm2 += (u_d0-u_d)*vol;
             if (radp <= rsink) {
-              accm1 = (u_d0-u_d)*vol/dt;
+              accm1 += (u_d0-u_d)*vol;
+              accr1 += (u_d0-u_d)*vol/dt;
             } else {
-              accm2 = (u_d0-u_d)*vol/dt;
+              accm2 += (u_d0-u_d)*vol;
+              accr2 += (u_d0-u_d)*vol/dt;
             }
           }
         }
@@ -469,15 +477,15 @@ void MeshBlock::UserWorkInLoop(void)
         u_m2 = u_d*w_vy;
 
         // apply extremely short cooling
-        //if (NON_BAROTROPIC_EOS){
-        //  Real pres0 = u_d*PoverR(rad,phi,z);
-        //  w_p = pres0;
-        //  w_p = (w_p > pfloor) ?  w_p : pfloor;
-        //  Real di = 1.0/u_d;
-        //  Real gmi = 1.0/(gamma_gas-1.0);
-        //  Real ke = 0.5*di*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3));
-        //  u_e = w_p*gmi+ke;
-        //}
+        // if (NON_BAROTROPIC_EOS){
+        //   Real pres0 = u_d*PoverR(rad,phi,z);
+        //   w_p = pres0;
+        //   w_p = (w_p > pfloor) ?  w_p : pfloor;
+        //   Real di = 1.0/u_d;
+        //   Real gmi = 1.0/(gamma_gas-1.0);
+        //   Real ke = 0.5*di*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3));
+        //   u_e = w_p*gmi+ke;
+        // }
 
       }
     }
@@ -634,12 +642,7 @@ void Cooling(MeshBlock *pmb, const Real time, const Real dt, const AthenaArray<R
 
 static Real hst_accm(MeshBlock *pmb, int iout)
 {
-  //std::cout <<"gid = "<< pmb->gid << " accm1= " << pmb->accm1 << " accm2= " << pmb->accm2 << std::endl;
-  if (iout == 0) {
-    return pmb->ruser_meshblock_data[0](0);
-  } else {
-    return pmb->ruser_meshblock_data[0](1);
-  }
+    return pmb->ruser_meshblock_data[0](iout);
 }
 
 void DiodeInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &a,
