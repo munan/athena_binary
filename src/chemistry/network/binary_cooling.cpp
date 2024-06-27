@@ -49,7 +49,9 @@ ChemNetwork::ChemNetwork(MeshBlock *pmb, ParameterInput *pin) {
 
   //calculate viscosity
   const Real omega_cgs = 1. / pmy_mb_->pmy_mesh->punit->code_time_cgs;
-  nu_ = ChemistryUtility::GetViscosityBinaryDisk(alpha_vis_, omega_cgs);
+
+  //softening radius
+  rsoft_cgs_ = 0.1 * pmy_mb_->pmy_mesh->punit->code_length_cgs;
 }
 
 //----------------------------------------------------------------------------------------
@@ -131,13 +133,12 @@ Real ChemNetwork::Edot(const Real t, const Real *y, const Real ED) {
     return 0;
   }
   const Real T_floor = 1.; // temperature floor for cooling
-  const Real T_celling = 1000.; // temperature celling for heating
   // sound speed cs^2 in cgs
   const Real cs_sq_cgs = ED/sigma_ * gm1_
                            * SQR(pmy_mb_->pmy_mesh->punit->code_velocity_cgs);
   const Real T = cs_sq_cgs *  muH_ * Constants::hydrogen_mass_cgs
                   / Constants::k_boltzmann_cgs;
-  if (T < T_floor || T > T_celling) {
+  if (T < T_floor) {
     return 0;
   }
   const Real tau = sigma_cgs_ * GetKappa(T);
@@ -149,8 +150,8 @@ Real ChemNetwork::Edot(const Real t, const Real *y, const Real ED) {
                           * SQR(pmy_mb_->pmy_mesh->punit->code_velocity_cgs)
                           * mdots_cgs_;
   const Real f_firr = 0.127456; // factor 0.1/0.5**0.35
-  const Real flux_irr_p = f_firr * lum_acc_p/( 4.*PI*SQR(rdiskp_cgs_) );
-  const Real flux_irr_s = f_firr * lum_acc_s/( 4.*PI*SQR(rdisks_cgs_) );
+  const Real flux_irr_p = f_firr * lum_acc_p/( 4.*PI*SQR(rdiskp_cgs_+rsoft_cgs_) );
+  const Real flux_irr_s = f_firr * lum_acc_s/( 4.*PI*SQR(rdisks_cgs_+rsoft_cgs_) );
   const Real flux_irr = flux_irr_p + flux_irr_s;
   // calculate dust cooling
   const Real flux_cool = ( Constants::stefan_boltzmann_cgs * SQR(T)*SQR(T)

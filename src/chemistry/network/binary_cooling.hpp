@@ -50,14 +50,14 @@ class ChemNetwork : public NetworkWrapper {
   Real rstar_rsun_;     //stellar radius in solar radius
   Real rstar_;      //stellar radius in code units
   Real alpha_vis_;      //alpha for calculating viscosity
-  Real nu_;   //viscosity in cgs, calculated from alpha_vis
   Real f_lacc_; // efficiency for accretion luminosity
 
   //variables updated at InitializeNextStep from hydro variable
   Real sigma_;     // surface density in code units
   Real sigma_cgs_; // surface density in cgs
 
-  //variables for 0D cooling
+  //variables for cooling
+  Real rsoft_cgs_;      // softening radius for calcuating radiation
   Real rdiskp_cgs_;     // distance to primary star in code units
   Real rdisks_cgs_;     // distance to secondary star in code units
   Real mdotp_cgs_;  // mass accretion rate for primary in cgs
