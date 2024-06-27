@@ -77,12 +77,12 @@ void ChemNetwork::InitializeNextStep(const int k, const int j, const int i) {
                 * pmy_mb_->pmy_mesh->punit->code_length_cgs;
 
   // distance to binary stars
-  const Real x1p = pmy_mb_->ruser_meshblock_data[1](0)
-  const Real x2p = pmy_mb_->ruser_meshblock_data[1](1)
-  const Real x3p = pmy_mb_->ruser_meshblock_data[1](2)
-  const Real x1s = pmy_mb_->ruser_meshblock_data[2](0)
-  const Real x2s = pmy_mb_->ruser_meshblock_data[2](1)
-  const Real x3s = pmy_mb_->ruser_meshblock_data[2](2)
+  const Real x1p = pmy_mb_->ruser_meshblock_data[1](0);
+  const Real x2p = pmy_mb_->ruser_meshblock_data[1](1);
+  const Real x3p = pmy_mb_->ruser_meshblock_data[1](2);
+  const Real x1s = pmy_mb_->ruser_meshblock_data[2](0);
+  const Real x2s = pmy_mb_->ruser_meshblock_data[2](1);
+  const Real x3s = pmy_mb_->ruser_meshblock_data[2](2);
   const Real x1 = pmy_mb_->pcoord->x1v(i);
   const Real x2 = pmy_mb_->pcoord->x2v(j);
   const Real x3 = pmy_mb_->pcoord->x3v(k);
@@ -97,6 +97,9 @@ void ChemNetwork::InitializeNextStep(const int k, const int j, const int i) {
                  / pmy_mb_->pmy_mesh->punit->code_time_cgs;
   mdots_cgs_ = mdots * pmy_mb_->pmy_mesh->punit->code_mass_cgs
                  / pmy_mb_->pmy_mesh->punit->code_time_cgs;
+  // TODO(Munan Gong): for test in steady-state. Remove for time-dependent run
+  // mdotp_cgs_ = 2.e20;
+  // mdots_cgs_ = 1.e20;
   return;
 }
 
@@ -128,12 +131,13 @@ Real ChemNetwork::Edot(const Real t, const Real *y, const Real ED) {
     return 0;
   }
   const Real T_floor = 1.; // temperature floor for cooling
+  const Real T_celling = 1000.; // temperature celling for heating
   // sound speed cs^2 in cgs
   const Real cs_sq_cgs = ED/sigma_ * gm1_
                            * SQR(pmy_mb_->pmy_mesh->punit->code_velocity_cgs);
   const Real T = cs_sq_cgs *  muH_ * Constants::hydrogen_mass_cgs
                   / Constants::k_boltzmann_cgs;
-  if (T < T_floor) {
+  if (T < T_floor || T > T_celling) {
     return 0;
   }
   const Real tau = sigma_cgs_ * GetKappa(T);
