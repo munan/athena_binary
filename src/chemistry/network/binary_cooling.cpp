@@ -46,6 +46,7 @@ ChemNetwork::ChemNetwork(MeshBlock *pmb, ParameterInput *pin) {
             / pmy_mb_->pmy_mesh->punit->code_length_cgs;
   alpha_vis_ =  pin->GetReal("problem", "alpha_vis");
   f_lacc_ =  pin->GetReal("problem", "f_lacc");
+  T_floor_ =  pin->GetReal("problem", "T_floor");
 
   //calculate viscosity
   const Real omega_cgs = 1. / pmy_mb_->pmy_mesh->punit->code_time_cgs;
@@ -132,13 +133,12 @@ Real ChemNetwork::Edot(const Real t, const Real *y, const Real ED) {
   if (!NON_BAROTROPIC_EOS) {
     return 0;
   }
-  const Real T_floor = 1.; // temperature floor for cooling
   // sound speed cs^2 in cgs
   const Real cs_sq_cgs = ED/sigma_ * gm1_
                            * SQR(pmy_mb_->pmy_mesh->punit->code_velocity_cgs);
   const Real T = cs_sq_cgs *  muH_ * Constants::hydrogen_mass_cgs
                   / Constants::k_boltzmann_cgs;
-  if (T < T_floor) {
+  if (T < T_floor_) {
     return 0;
   }
   const Real tau = sigma_cgs_ * GetKappa(T);

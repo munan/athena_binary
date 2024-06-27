@@ -51,6 +51,7 @@ class ChemNetwork : public NetworkWrapper {
   Real rstar_;      //stellar radius in code units
   Real alpha_vis_;      //alpha for calculating viscosity
   Real f_lacc_; // efficiency for accretion luminosity
+  Real T_floor_; //temperature floor below which dEdt=0
 
   //variables updated at InitializeNextStep from hydro variable
   Real sigma_;     // surface density in code units
