@@ -55,10 +55,12 @@ class ChemNetwork : public NetworkWrapper {
 
   //variables updated at InitializeNextStep from hydro variable
   Real sigma_;     // surface density in code units
+  Real sigma_cgs_; // surface density in cgs
 
   //variables for 0D cooling
-  //TODO(Munan Gong): need to be modified for 2D disk simulation
-  Real rdisk_;     // circumbinary disk radius in code units
-  Real mdot_cgs_;  // mass accretion rate in cgs
+  Real rdiskp_cgs_;     // distance to primary star in code units
+  Real rdisks_cgs_;     // distance to secondary star in code units
+  Real mdotp_cgs_;  // mass accretion rate for primary in cgs
+  Real mdots_cgs_;  // mass accretion rate for secondary in cgs
 };
 #endif // CHEMISTRY_NETWORK_BINARY_COOLING_HPP_

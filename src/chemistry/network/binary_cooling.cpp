@@ -50,10 +50,6 @@ ChemNetwork::ChemNetwork(MeshBlock *pmb, ParameterInput *pin) {
   //calculate viscosity
   const Real omega_cgs = 1. / pmy_mb_->pmy_mesh->punit->code_time_cgs;
   nu_ = ChemistryUtility::GetViscosityBinaryDisk(alpha_vis_, omega_cgs);
-
-  //TODO(Munan Gong): these need to be modified for binary disk run
-  rdisk_ = 1.; //need to be distance to either binary star for calculating L_star(s)
-
 }
 
 //----------------------------------------------------------------------------------------
@@ -69,7 +65,6 @@ ChemNetwork::~ChemNetwork() {
 //! k, j, i are the corresponding index of the grid
 
 void ChemNetwork::InitializeNextStep(const int k, const int j, const int i) {
-  //TODO(Munan Gong): we need to change this likely
   Real rho, rho_floor;
   // density
   rho = pmy_mb_->phydro->w(IDN, k, j, i);
@@ -78,6 +73,30 @@ void ChemNetwork::InitializeNextStep(const int k, const int j, const int i) {
   rho = (rho > rho_floor) ?  rho : rho_floor;
   // 2D density -> surface density
   sigma_ =  rho;
+  sigma_cgs_ = sigma_ * pmy_mb_->pmy_mesh->punit->code_density_cgs
+                * pmy_mb_->pmy_mesh->punit->code_length_cgs;
+
+  // distance to binary stars
+  const Real x1p = pmy_mb_->ruser_meshblock_data[1](0)
+  const Real x2p = pmy_mb_->ruser_meshblock_data[1](1)
+  const Real x3p = pmy_mb_->ruser_meshblock_data[1](2)
+  const Real x1s = pmy_mb_->ruser_meshblock_data[2](0)
+  const Real x2s = pmy_mb_->ruser_meshblock_data[2](1)
+  const Real x3s = pmy_mb_->ruser_meshblock_data[2](2)
+  const Real x1 = pmy_mb_->pcoord->x1v(i);
+  const Real x2 = pmy_mb_->pcoord->x2v(j);
+  const Real x3 = pmy_mb_->pcoord->x3v(k);
+  rdiskp_cgs_ = sqrt(SQR(x1-x1p)+SQR(x2-x2p)+SQR(x3-x3p))
+                 * pmy_mb_->pmy_mesh->punit->code_length_cgs;
+  rdisks_cgs_ = sqrt(SQR(x1-x1s)+SQR(x2-x2s)+SQR(x3-x3s))
+                 * pmy_mb_->pmy_mesh->punit->code_length_cgs;
+  // mass accretion rates
+  const Real mdotp = pmy_mb_->ruser_meshblock_data[0](2);
+  const Real mdots = pmy_mb_->ruser_meshblock_data[0](3);
+  mdotp_cgs_ = mdotp * pmy_mb_->pmy_mesh->punit->code_mass_cgs
+                 / pmy_mb_->pmy_mesh->punit->code_time_cgs;
+  mdots_cgs_ = mdots * pmy_mb_->pmy_mesh->punit->code_mass_cgs
+                 / pmy_mb_->pmy_mesh->punit->code_time_cgs;
   return;
 }
 
@@ -117,19 +136,18 @@ Real ChemNetwork::Edot(const Real t, const Real *y, const Real ED) {
   if (T < T_floor) {
     return 0;
   }
-  const Real sigma_cgs = sigma_ * pmy_mb_->pmy_mesh->punit->code_density_cgs
-                          * pmy_mb_->pmy_mesh->punit->code_length_cgs;
-  const Real tau = sigma_cgs * GetKappa(T);
-  //TODO(Munan Gong): need to read mdot from binary accretion
-  mdot_cgs_ = 3. * PI * nu_ * sigma_cgs;
+  const Real tau = sigma_cgs_ * GetKappa(T);
   // calculate accretion luminosity and irradiation flux
-  // TODO(Munan Gong): need to account for luminosity from both stars
-  const Real lum_acc = f_lacc_ * (1./rstar_)
-                        * SQR(pmy_mb_->pmy_mesh->punit->code_velocity_cgs)
-                        * mdot_cgs_;
+  const Real lum_acc_p = f_lacc_ * (1./rstar_)
+                          * SQR(pmy_mb_->pmy_mesh->punit->code_velocity_cgs)
+                          * mdotp_cgs_;
+  const Real lum_acc_s = f_lacc_ * (1./rstar_)
+                          * SQR(pmy_mb_->pmy_mesh->punit->code_velocity_cgs)
+                          * mdots_cgs_;
   const Real f_firr = 0.127456; // factor 0.1/0.5**0.35
-  const Real rdisk_cgs = rdisk_ * pmy_mb_->pmy_mesh->punit->code_length_cgs;
-  const Real flux_irr = f_firr * lum_acc/( 4.*PI*SQR(rdisk_cgs) );
+  const Real flux_irr_p = f_firr * lum_acc_p/( 4.*PI*SQR(rdiskp_cgs_) );
+  const Real flux_irr_s = f_firr * lum_acc_s/( 4.*PI*SQR(rdisks_cgs_) );
+  const Real flux_irr = flux_irr_p + flux_irr_s;
   // calculate dust cooling
   const Real flux_cool = ( Constants::stefan_boltzmann_cgs * SQR(T)*SQR(T)
                            - flux_irr ) / (tau + 1./tau);

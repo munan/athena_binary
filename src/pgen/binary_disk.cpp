@@ -190,8 +190,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 //! \brief Allocate accretion rates array
 //========================================================================================
 void MeshBlock::InitUserMeshBlockData(ParameterInput *pin) {
-  AllocateRealUserMeshBlockDataField(1);
+  AllocateRealUserMeshBlockDataField(3);
+  //accretion mass and rates
   ruser_meshblock_data[0].NewAthenaArray(4);
+  // binary star positions
+  ruser_meshblock_data[1].NewAthenaArray(3);
+  ruser_meshblock_data[2].NewAthenaArray(3);
   return;
 }
 
@@ -378,6 +382,15 @@ void MeshBlock::UserWorkInLoop(void)
   //int ju = je;
   //int kl = ks;
   //int ku = ke;
+
+  // binary star positions
+  ruser_meshblock_data[1](0) = x1p;
+  ruser_meshblock_data[1](1) = x2p;
+  ruser_meshblock_data[1](2) = x3p;
+  ruser_meshblock_data[2](0) = x1s;
+  ruser_meshblock_data[2](1) = x2s;
+  ruser_meshblock_data[2](2) = x3s;
+  // accretion rates
   Real& accm1 = ruser_meshblock_data[0](0);
   Real& accm2 = ruser_meshblock_data[0](1);
   Real& accr1 = ruser_meshblock_data[0](2);
