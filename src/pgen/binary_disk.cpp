@@ -37,23 +37,24 @@ static void DiodeOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &a,
      FaceField &b, Real time, Real dt,
      int il, int iu, int jl, int ju, int kl, int ku, int ngh);
 
+//functions to compute binary locations
 void solve_u(const Real t, const Real dto, const Real e, Real *ua);
 void compute_f(Real ua, const Real e, Real *f_ptr);
 void compute_star_loc(const Real dto, const Real t, const Real e,
             const Real mf, Real *f_ptr, Real *u_ptr, Real *r_ptr);
 
+//convert Cartesean to Cylindrical cooridinates
 static void GetCylCoord(Coordinates *pco,Real &rad,Real &phi,Real &z,int i,int j,int k);
+//initial density profile in Cylindrical coordinates
 static Real DenProfileCyl(const Real rad, const Real phi, const Real z);
-static Real PoverR(const Real rad, const Real phi, const Real z);
+//initial velocity profile
 static void VelProfileCyl(const Real rad, const Real phi, const Real z,
                           Real &v1, Real &v2, Real &v3, const int flag);
+//wave killing at boundary
 static Real RampFunc(const Real rad, const Real phi, const Real z,
             const Real v1, const Real v2, const Real v3);
 
-//user defined src term
-void Cooling(MeshBlock *pmb, const Real time, const Real dt,
-             const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
-             AthenaArray<Real> &cons);
+//user defined src term: gravitational potential from binary
 void Binary(MeshBlock *pmb, const Real time, const Real dt,
             const AthenaArray<Real> &prim, const AthenaArray<Real> &prim_scalar,
             const AthenaArray<Real> &bcc, AthenaArray<Real> &cons,
@@ -63,13 +64,11 @@ static Real hst_accm(MeshBlock *pmb, int iout);
 
 // problem parameters which are useful to make global to this file
 static Real semia,ecc,qrat,mu,incli,argp;
-static Real gm0, r0, rho0, dslope, p0_over_r0, pslope, gamma_gas;
+static Real gm0, rho0, dslope, gamma_gas, iso_cs;
 static Real dfloor,pfloor;
-static Real rsoft,rsink,rin,rout,rbuf1,rbuf2;
+static Real rsoft,rsink,rin,rbuf1,rbuf2;
 static Real tsink; // mass removing time scale
 static Real tbin;  // binary period 2pi/(GM/a^3)^1/2
-static Real beta_th,alpha;
-static Real sinkpower;
 // parameters for computing binary orbit
 static int itermax=100;
 static Real dueps=1e-6;
@@ -98,26 +97,17 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   // semia:    semi-major axis(also the initial separation)
   // incli:    inclination(angle between disk and binary orbit planes)
   // ecc:      eccentrcity
-  // phi0_2:   initial phase angle of the secondary (0 as default)
-  // phi0_1:   initial phase angle of the primary(PI as default)
   // argp:     argument of periapse, angle between the axis of periapse and line of nodes
-  // lon:      angle between line of nodes and reference X-axis.Set to be zero always.
-  gm0  = pin->GetOrAddReal("problem","GMb",1.0);
+  gm0  = 1.0; // always 1 in code unites
   qrat = pin->GetOrAddReal("problem","ratio",1.0);
   mu = 1.0/(1.0+qrat);
   ecc  = pin->GetOrAddReal("problem","ecc",0.0);
   incli  = pin->GetOrAddReal("problem","inclination",0.0);
   argp   = pin->GetOrAddReal("problem","periapse",0.0);
-  semia  = pin->GetOrAddReal("problem","semi_major",1.0);
+  semia  = 1.0; // always 1 in code units
   tbin   = 2.0*PI/sqrt(gm0/semia/SQR(semia));
-  //phi0_2 = pin->GetOrAddReal("problem","phi0",0.0);
-  //phi0_1 = phi0_2+PI;
   rsoft = pin->GetOrAddReal("problem","rsoft",0.05);
   rsink = pin->GetOrAddReal("problem","rsink",0.05);
-  rsoft *= semia;
-  rsink *= semia;
-  beta_th = pin->GetOrAddReal("problem","beta_th",0.0);
-  sinkpower = pin->GetOrAddReal("problem","sink_power",1.5);
 
   // need to initialize binary position or from restart point
   Real dto = 0.01;
@@ -138,30 +128,23 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   x3s =-mu*rsinsin;
 
   // Get parameters for circumbinary disk
-  r0 = semia; // set length unit
   rin = pin->GetOrAddReal("problem","rin",0.0);
-  rout = pin->GetOrAddReal("problem","rout",5.0);
-  tsink = pin->GetOrAddReal("problem","tsink",100.0);
   rbuf1 = pin->GetOrAddReal("problem","rbuf1",8.0);
   rbuf2 = pin->GetOrAddReal("problem","rbuf2",10.0);
 
   // Get parameters for initial density and velocity
-  rho0 = pin->GetReal("problem","rho0");
+  rho0 = 1.0; // always 1 in code units
   dslope = pin->GetOrAddReal("problem","dslope",0.0);
 
-  // Get parameters of initial pressure and cooling parameters
+  // Get parameters of initial pressure and parameters
   if(NON_BAROTROPIC_EOS){
-    p0_over_r0 = pin->GetOrAddReal("problem","p0_over_r0",0.0025);
-    pslope = pin->GetOrAddReal("problem","pslope",0.0);
     gamma_gas = pin->GetReal("hydro","gamma");
-  }else{
-    p0_over_r0=SQR(pin->GetReal("hydro","iso_sound_speed"));
   }
+  iso_cs = pin->GetReal("hydro", "iso_sound_speed");
   dfloor=pin->GetOrAddReal("hydro","dfloor",(1024*(FLT_MIN)));
   pfloor=pin->GetOrAddReal("hydro","pfloor",(1024*(FLT_MIN)));
-  int inu = pin->GetOrAddReal("problem","inu",1);
-  if (inu != 0) alpha = pin->GetOrAddReal("problem","nuiso",0.1);
-  else          alpha = pin->GetOrAddReal("problem","nuiso",2.5e-4)/p0_over_r0;
+  nu_iso = pin->GetOrAddReal("problem","nu_iso");
+  tsink = 2. * SQR(rsink) / (3. * nu_iso);
 
 
   // Enroll user-defined physical source terms
@@ -211,32 +194,25 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
   //  Initialize density and momenta
   for(int k=ks; k<=ke; ++k) {
-  for (int j=js; j<=je; ++j) {
-    for (int i=is; i<=ie; ++i) {
-      GetCylCoord(pcoord,rad,phi,z,i,j,k); // convert to cylindrical coordinates
-      // 1) pure power law with truncation radii rin rout
-      //if (rad >= rin && rad <= rout)
-      //if (rad >= rin)
-      //  phydro->u(IDN,k,j,i) = DenProfileCyl(rad,phi,z);
-      //else
-      //  phydro->u(IDN,k,j,i) = dfloor;
-      // 2) power law profile with exponential taper interior to rin
-      Real den0 = DenProfileCyl(rad,phi,z)*exp(-pow((rad/rin),-2.0));
-      den0 = (den0 > dfloor) ?  den0 : dfloor;
-      phydro->u(IDN,k,j,i) = den0;
-      VelProfileCyl(rad,phi,z,v1,v2,v3,1);
-      phydro->u(IM1,k,j,i) = den0*v1;
-      phydro->u(IM2,k,j,i) = den0*v2;
-      phydro->u(IM3,k,j,i) = den0*v3;
-      if (NON_BAROTROPIC_EOS){
-        Real p_over_r = PoverR(rad,phi,z);
-        phydro->u(IEN,k,j,i) = p_over_r*phydro->u(IDN,k,j,i)/(gamma_gas - 1.0);
-        phydro->u(IEN,k,j,i) += 0.5*(SQR(phydro->u(IM1,k,j,i))+SQR(phydro->u(IM2,k,j,i))
-                                   + SQR(phydro->u(IM3,k,j,i)))/phydro->u(IDN,k,j,i);
+    for (int j=js; j<=je; ++j) {
+      for (int i=is; i<=ie; ++i) {
+        GetCylCoord(pcoord,rad,phi,z,i,j,k); // convert to cylindrical coordinates
+                                             //exponential taper interior to rin
+        Real den0 = DenProfileCyl(rad,phi,z)*exp(-pow((rad/rin),-2.0));
+        den0 = (den0 > dfloor) ?  den0 : dfloor;
+        phydro->u(IDN,k,j,i) = den0;
+        VelProfileCyl(rad,phi,z,v1,v2,v3,1);
+        phydro->u(IM1,k,j,i) = den0*v1;
+        phydro->u(IM2,k,j,i) = den0*v2;
+        phydro->u(IM3,k,j,i) = den0*v3;
+        if (NON_BAROTROPIC_EOS){
+          phydro->u(IEN,k,j,i) = SQR(iso_cs)*den0/(gamma_gas - 1.0);
+          phydro->u(IEN,k,j,i) += 0.5*(SQR(phydro->u(IM1,k,j,i))+SQR(phydro->u(IM2,k,j,i))
+              + SQR(phydro->u(IM3,k,j,i)))/phydro->u(IDN,k,j,i);
+        }
       }
     }
-  }}
-
+  }
   return;
 }
 
@@ -257,32 +233,12 @@ static void GetCylCoord(Coordinates *pco,Real &rad,Real &phi,Real &z,int i,int j
 static Real DenProfileCyl(const Real rad, const Real phi, const Real z)
 {
   Real den;
-  Real p_over_r = p0_over_r0;
-  if (NON_BAROTROPIC_EOS) p_over_r = PoverR(rad, phi, z);
-  Real denmid = rho0*pow(rad/r0,dslope);
-  Real dentem = denmid*exp(gm0/p_over_r*(1./sqrt(SQR(rad)+SQR(rsoft)+SQR(z))-1./sqrt(SQR(rad)+SQR(rsoft))));
+  Real denmid = rho0*pow(rad,dslope);
+  Real dentem = denmid*exp( gm0/SQR(iso_cs)
+      *(1./sqrt(SQR(rad)+SQR(rsoft)+SQR(z))-1./sqrt(SQR(rad)+SQR(rsoft))) );
   den = dentem;
   return std::max(den,dfloor);
 }
-
-//----------------------------------------------------------------------------------------
-//! \f  computes pressure/density in cylindrical coordinates
-
-static Real PoverR(const Real rad, const Real phi, const Real z)
-{
-  Real poverr;
-  // 1) simple power law with index pslope
-  //poverr = p0_over_r0*pow(rad/r0, pslope);
-  // 2) P/rho = Cs(r,phi,z)^2/gamma
-  //          = (h/r)^2*(GM1/r1+GM2/r2)/gamma
-  Real x1 = rad*cos(phi);
-  Real x2 = rad*sin(phi);
-  Real rad1 = sqrt(SQR(x1-x1p)+SQR(x2-x2p)+SQR(z-x3p)+SQR(rsoft));
-  Real rad2 = sqrt(SQR(x1-x1s)+SQR(x2-x2s)+SQR(z-x3s)+SQR(rsoft));
-  poverr = p0_over_r0*gm0*(mu/rad1+(1.0-mu)/rad2)/gamma_gas;
-  return poverr;
-}
-
 
 //----------------------------------------------------------------------------------------
 //! \f  computes rotational velocity in cylindrical coordinates
@@ -290,20 +246,17 @@ static Real PoverR(const Real rad, const Real phi, const Real z)
 static void VelProfileCyl(const Real rad, const Real phi, const Real z,
                           Real &v1, Real &v2, Real &v3, const int flag)
 {
-  Real p_over_r = p0_over_r0;
-  if (NON_BAROTROPIC_EOS) p_over_r = PoverR(rad, phi, z);
   Real rad1 = sqrt(SQR(rad)+SQR(rsoft));
   Real rad2 = sqrt(SQR(rad)+SQR(rsoft)+SQR(z));
   Real qrpl = 0.75*SQR(semia/rad1)*qrat/SQR(1.0+qrat);
-  Real vel = sqrt((dslope+pslope)*p_over_r + gm0*SQR(rad/rad1)/rad1*(1.0+qrpl)
-            +pslope*gm0*(1.0/rad1 -1.0/rad2));
+  Real vel = sqrt(gm0*SQR(rad/rad1)/rad1*(1.0+qrpl));
 
   v1 = -vel*sin(phi);
   v2 = vel*cos(phi);
   v3 = 0.0;
   // correct with radial drift due to accretion
   if (NON_BAROTROPIC_EOS && flag) {
-    vel = 1.5*p_over_r*gamma_gas*alpha/sqrt(gm0/sqrt(SQR(rad)+SQR(rsoft)));
+    vel = 1.5 * nu_iso / sqrt(SQR(rad)+SQR(rsoft)); // v_r = 1.5 nu / r
     v1 -= vel*cos(phi);
     v2 -= vel*sin(phi);
   }
@@ -353,7 +306,7 @@ void MeshBlock::UserWorkInLoop(void)
   Real v2s = -mu*ve*cosi;
   Real v3s = mu*ve*sini;
 
-  // DEBUG: binary orbit
+  // binary orbit data
   if (gid == 0 && pmy_mesh->time >= tstart && pmy_mesh->time <= (2.0*PI)) {
     tstart += 0.01*tbin;
     fprintf(pf,"%19.15e %19.15e %19.15e %19.15e %19.15e %19.15e %19.15e \
@@ -361,7 +314,7 @@ void MeshBlock::UserWorkInLoop(void)
       %19.15e\n",pmy_mesh->time, fanorm,uanorm,
       rsep,x1s,x2s,x3s,x1p,x2p,x3p,v1s,v2s,v3s,v1p,v2p,v3p);
   }
-  //// Prepare index bounds
+  // Prepare index bounds
   int il = is - NGHOST;
   int iu = ie + NGHOST;
   int jl = js;
@@ -376,12 +329,6 @@ void MeshBlock::UserWorkInLoop(void)
     kl -= (NGHOST);
     ku += (NGHOST);
   }
-  //int il = is;
-  //int iu = ie;
-  //int jl = js;
-  //int ju = je;
-  //int kl = ks;
-  //int ku = ke;
 
   // binary star positions
   ruser_meshblock_data[1](0) = x1p;
@@ -425,9 +372,7 @@ void MeshBlock::UserWorkInLoop(void)
         // apply sink cells condition within rsink( ususally >= rsoft)
         if ((radp <= rsink)||(rads <=rsink)) {
           Real u_d0 = u_d;
-          Real trm = std::max(dt,tsink*pow(std::min(radp,rads)/rsink, sinkpower));
-          // steeper than alpha model
-          //Real trm = std::max(dt,tsink*pow(std::min(radp,rads)/rsink, 3.0));
+          Real trm = std::max(dt,tsink*SQR(std::min(radp,rads)/rsink));
           u_d -= dt*u_d/trm;
           // apply density floor, without changing momentum or energy
           u_d = (u_d > dfloor) ?  u_d : dfloor;
@@ -467,39 +412,17 @@ void MeshBlock::UserWorkInLoop(void)
           w_vx = u_m1*di;
           w_vy = u_m2*di;
           w_vz = u_m3*di;
-
-          // Extremely short cooling
-          // if (NON_BAROTROPIC_EOS){
-          //   Real p_over_r = PoverR(rad,phi,z);
-          //   Real pres0 = p_over_r*den0;
-          //   w_p -= dt*(w_p-pres0)*ramp;
-          //   w_p = (w_p > pfloor) ?  w_p : pfloor;
-          //   Real ke = 0.5*di*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3));
-          //   u_e = w_p/(gamma_gas-1.0)+ke;
-          // }
         }
         // apply velocity cap
         u_d = (u_d > dfloor) ?  u_d : dfloor;
         w_d = u_d;
-        Real vcap = 50.0*sqrt(p0_over_r0);
+        Real vcap = 50.0*iso_cs;
         w_vz = (fabs(w_vz) <= vcap) ? w_vz : 0.0;
         u_m3 = u_d*w_vz;
         w_vx = (fabs(w_vx) <= vcap) ? w_vx : 0.0;
         u_m1 = u_d*w_vx;
         w_vy = (fabs(w_vy) <= vcap) ? w_vy : 0.0;
         u_m2 = u_d*w_vy;
-
-        // apply extremely short cooling
-        // if (NON_BAROTROPIC_EOS){
-        //   Real pres0 = u_d*PoverR(rad,phi,z);
-        //   w_p = pres0;
-        //   w_p = (w_p > pfloor) ?  w_p : pfloor;
-        //   Real di = 1.0/u_d;
-        //   Real gmi = 1.0/(gamma_gas-1.0);
-        //   Real ke = 0.5*di*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3));
-        //   u_e = w_p*gmi+ke;
-        // }
-
       }
     }
   }
@@ -509,7 +432,7 @@ void MeshBlock::UserWorkInLoop(void)
 
 void Mesh::UserWorkAfterLoop(ParameterInput *pin)
 {
-  // DEBUG: binary orbit
+  // binary orbit
   if (time > (2.0*PI)) fclose(pf);
   return;
 }
@@ -620,37 +543,10 @@ void Binary(MeshBlock *pmb, const Real time, const Real dt,
         if (NON_BAROTROPIC_EOS) cons(IEN,k,j,i) -=
           srcp*((x1-x1p)*prim(IVX,k,j,i)+(x2-x2p)*prim(IVY,k,j,i)+(x3-x3p)*prim(IVZ,k,j,i))+
           srcs*((x1-x1s)*prim(IVX,k,j,i)+(x2-x2s)*prim(IVY,k,j,i)+(x3-x3s)*prim(IVZ,k,j,i));
-  }}}
-
-  // we delay the super-short cooling in UserWorkInLoop.
-  //if (NON_BAROTROPIC_EOS && beta_th != 0.0)
-  //  Cooling(pmb,time,dt,prim,bcc,cons);
-
-}
-
-// uncomment the following if the cooling is physical and evaluate at each substep
-//
-void Cooling(MeshBlock *pmb, const Real time, const Real dt, const AthenaArray<Real> &prim,
-             const AthenaArray<Real> &bcc, AthenaArray<Real> &cons)
-{
-  // apply extremely short cooling
-  //Real gam = pmb->peos->GetGamma();
-  //Real gam1 = pmb->peos->GetGamma()-1.0;
-  Real gam1 = gamma_gas-1.0;
-  Real rad, phi, z;
-  for (int k=pmb->ks; k<=pmb->ke; ++k) {
-    for (int j=pmb->js; j<=pmb->je; ++j) {
-      for (int i=pmb->is; i<=pmb->ie; ++i) {
-        GetCylCoord(pmb->pcoord,rad,phi,z,i,j,k); // convert to cylindrical coordinates
-        Real eth = cons(IEN,k,j,i)-0.5*(SQR(cons(IM1,k,j,i))+SQR(cons(IM2,k,j,i))+
-                   SQR(cons(IM3,k,j,i)))/cons(IDN,k,j,i);
-        Real eth0 = cons(IDN,k,j,i)*PoverR(rad,phi,z)/gam1;
-        Real tcool= std::max(beta_th*2.0*PI/sqrt(gm0/SQR(rad)/rad),dt);
-        cons(IEN,k,j,i) -= (eth-eth0)*dt/tcool;
       }
     }
   }
-  return;
+
 }
 
 static Real hst_accm(MeshBlock *pmb, int iout)
