@@ -20,14 +20,15 @@
 // Athena++ headers
 #include "../athena.hpp"
 #include "../athena_arrays.hpp"
+#include "../bvals/bvals.hpp"
+#include "../coordinates/coordinates.hpp"
+#include "../eos/eos.hpp"
+#include "../field/field.hpp"
+#include "../hydro/hydro.hpp"
+#include "../hydro/hydro_diffusion/hydro_diffusion.hpp"
 #include "../mesh/mesh.hpp"
 #include "../parameter_input.hpp"
-#include "../hydro/hydro.hpp"
-#include "../eos/eos.hpp"
-#include "../bvals/bvals.hpp"
-#include "../field/field.hpp"
-#include "../coordinates/coordinates.hpp"
-#include "../hydro/hydro_diffusion/hydro_diffusion.hpp"
+#include "../scalars/scalars.hpp"
 
 //user boundary conditions
 static void DiodeInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &a,
@@ -36,6 +37,9 @@ static void DiodeInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &a,
 static void DiodeOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &a,
      FaceField &b, Real time, Real dt,
      int il, int iu, int jl, int ju, int kl, int ku, int ngh);
+
+//user timestep
+Real CoolingTimeStep(MeshBlock *pmb);
 
 //functions to compute binary locations
 void solve_u(const Real t, const Real dto, const Real e, Real *ua);
@@ -64,7 +68,7 @@ static Real hst_accm(MeshBlock *pmb, int iout);
 
 // problem parameters which are useful to make global to this file
 static Real semia,ecc,qrat,mu,incli,argp;
-static Real gm0, rho0, dslope, gamma_gas, iso_cs;
+static Real gm0, rho0, dslope, gamma_gas, iso_cs, nu_iso;
 static Real dfloor,pfloor;
 static Real rsoft,rsink,rin,rbuf1,rbuf2;
 static Real tsink; // mass removing time scale
@@ -76,6 +80,8 @@ static Real dueps=1e-6;
 static Real rsep,uanorm,fanorm;
 //real-time binary postion in cartesian
 static Real x1s,x2s,x3s,x1p,x2p,x3p;
+//cfl number for cooling timestep
+static Real cfl_cool;
 
 // debug for binary orbit
 static FILE * pf;
@@ -143,9 +149,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   iso_cs = pin->GetReal("hydro", "iso_sound_speed");
   dfloor=pin->GetOrAddReal("hydro","dfloor",(1024*(FLT_MIN)));
   pfloor=pin->GetOrAddReal("hydro","pfloor",(1024*(FLT_MIN)));
-  nu_iso = pin->GetOrAddReal("problem","nu_iso");
+  nu_iso = pin->GetReal("problem","nu_iso");
   tsink = 2. * SQR(rsink) / (3. * nu_iso);
 
+  //cfl number for cooling time
+  cfl_cool = pin->GetReal("hydro","cfl_cool");
 
   // Enroll user-defined physical source terms
   if (qrat != 0.0) EnrollUserExplicitSourceFunction(Binary);
@@ -161,6 +169,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   EnrollUserHistoryOutput(2, hst_accm, "accr1");
   EnrollUserHistoryOutput(3, hst_accm, "accr2");
 
+  //cooling time
+  EnrollUserTimeStepFunction(CoolingTimeStep);
 
   // debug binary orbit
   pf = fopen ("binary_orbit.tab","w");
@@ -214,6 +224,40 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     }
   }
   return;
+}
+
+
+//----------------------------------------------------------------------------------------
+//!\f limit timestep to cooling time
+
+Real CoolingTimeStep(MeshBlock *pmb)
+{
+  const Real time = pmb->pmy_mesh->time;// code time
+  const Real small_ = 1024 * std::numeric_limits<float>::min();
+  Real min_dt=FLT_MAX;
+  Real dt, E, Edot;
+  Real *y = new Real[NSPECIES];
+  if (NON_BAROTROPIC_EOS) {
+    for (int k=pmb->ks; k<=pmb->ke; ++k) {
+      for (int j=pmb->js; j<=pmb->je; ++j) {
+        for (int i=pmb->is; i<=pmb->ie; ++i) {
+          AthenaArray<Real> &u = pmb->phydro->u;
+          // copy species abundance
+          for (int ispec=0; ispec<NSPECIES; ispec++) {
+            y[ispec] = pmb->pscalars->s(ispec,k,j,i)/u(IDN,k,j,i);
+          }
+          E = u(IEN,k,j,i)
+            - 0.5*( SQR(u(IM1,k,j,i)) + SQR(u(IM2,k,j,i)) + SQR(u(IM3,k,j,i))
+                   )/u(IDN,k,j,i);
+          Edot = pmb->pscalars->chemnet.Edot(time, y, E);
+          dt = std::abs(E) / ( std::abs(Edot)+small_ ) + small_;
+          min_dt = std::min(min_dt, dt);
+        }
+      }
+    }
+  }
+  delete[] y;
+  return min_dt * cfl_cool;
 }
 
 //----------------------------------------------------------------------------------------

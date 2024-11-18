@@ -44,15 +44,22 @@ ChemNetwork::ChemNetwork(MeshBlock *pmb, ParameterInput *pin) {
   rstar_rsun_ =  pin->GetReal("problem", "rstar_rsun");
   rstar_ = rstar_rsun_ * Constants::solar_radius_cgs
             / pmy_mb_->pmy_mesh->punit->code_length_cgs;
-  alpha_vis_ =  pin->GetReal("problem", "alpha_vis");
   f_lacc_ =  pin->GetReal("problem", "f_lacc");
   T_floor_ =  pin->GetReal("problem", "T_floor");
+  tau_floor_ =  pin->GetReal("problem", "tau_floor");
 
   //calculate viscosity
   const Real omega_cgs = 1. / pmy_mb_->pmy_mesh->punit->code_time_cgs;
 
   //softening radius
-  rsoft_cgs_ = 0.1 * pmy_mb_->pmy_mesh->punit->code_length_cgs;
+  const Real rsoft = pin->GetOrAddReal("problem","rsoft",0.05);
+  rsoft_cgs_ = rsoft * pmy_mb_->pmy_mesh->punit->code_length_cgs;
+
+  //binary mass
+  const Real qrat = pin->GetOrAddReal("problem","ratio",1.0);
+  const Real mu = 1.0/(1.0+qrat);
+  mp_ = mu;
+  ms_ = 1.0 - mu;
 }
 
 //----------------------------------------------------------------------------------------
@@ -100,9 +107,6 @@ void ChemNetwork::InitializeNextStep(const int k, const int j, const int i) {
                  / pmy_mb_->pmy_mesh->punit->code_time_cgs;
   mdots_cgs_ = mdots * pmy_mb_->pmy_mesh->punit->code_mass_cgs
                  / pmy_mb_->pmy_mesh->punit->code_time_cgs;
-  // TODO(Munan Gong): for test in steady-state. Remove for time-dependent run
-  // mdotp_cgs_ = 2.e20;
-  // mdots_cgs_ = 1.e20;
   return;
 }
 
@@ -132,7 +136,7 @@ Real ChemNetwork::Edot(const Real t, const Real *y, const Real ED) {
   // isothermal
   if (!NON_BAROTROPIC_EOS) {
     return 0;
-  }
+  };
   // sound speed cs^2 in cgs
   const Real cs_sq_cgs = ED/sigma_ * gm1_
                            * SQR(pmy_mb_->pmy_mesh->punit->code_velocity_cgs);
@@ -141,12 +145,12 @@ Real ChemNetwork::Edot(const Real t, const Real *y, const Real ED) {
   if (T < T_floor_) {
     return 0;
   }
-  const Real tau = sigma_cgs_ * GetKappa(T);
+  const Real tau = sigma_cgs_ * GetKappa(T) + tau_floor_;
   // calculate accretion luminosity and irradiation flux
-  const Real lum_acc_p = f_lacc_ * (1./rstar_)
+  const Real lum_acc_p = f_lacc_ * (1./rstar_) * mp_
                           * SQR(pmy_mb_->pmy_mesh->punit->code_velocity_cgs)
                           * mdotp_cgs_;
-  const Real lum_acc_s = f_lacc_ * (1./rstar_)
+  const Real lum_acc_s = f_lacc_ * (1./rstar_) * ms_
                           * SQR(pmy_mb_->pmy_mesh->punit->code_velocity_cgs)
                           * mdots_cgs_;
   const Real f_firr = 0.127456; // factor 0.1/0.5**0.35
@@ -174,10 +178,11 @@ Real ChemNetwork::Edot(const Real t, const Real *y, const Real ED) {
 
 Real ChemNetwork::GetKappa(const Real temp) {
   Real kappa = 0.;
-  const Real temp_sub = 1500.; //dust sublimation temperature in K
-  if (temp > temp_sub) {
-    return 0.;
-  }
+  //TODO(Munan Gong): here we ignore dust sublimation to see if it helps with stability
+  //const Real temp_sub = 1500.; //dust sublimation temperature in K
+  //if (temp > temp_sub) {
+  //  return 0.;
+  //}
   if (temp < 150.) {
     kappa = 2.0e-4 * temp*temp;
   } else {

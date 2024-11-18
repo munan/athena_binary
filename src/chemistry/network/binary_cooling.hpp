@@ -49,9 +49,9 @@ class ChemNetwork : public NetworkWrapper {
   Real muH_;  //mean molecular weight per hydrogen nuclei
   Real rstar_rsun_;     //stellar radius in solar radius
   Real rstar_;      //stellar radius in code units
-  Real alpha_vis_;      //alpha for calculating viscosity
   Real f_lacc_; // efficiency for accretion luminosity
   Real T_floor_; //temperature floor below which dEdt=0
+  Real tau_floor_; //dust optical depth floor
 
   //variables updated at InitializeNextStep from hydro variable
   Real sigma_;     // surface density in code units
@@ -63,5 +63,7 @@ class ChemNetwork : public NetworkWrapper {
   Real rdisks_cgs_;     // distance to secondary star in code units
   Real mdotp_cgs_;  // mass accretion rate for primary in cgs
   Real mdots_cgs_;  // mass accretion rate for secondary in cgs
+  Real mp_;         // mass of primary in code units
+  Real ms_;         // mass of secondary in code units
 };
 #endif // CHEMISTRY_NETWORK_BINARY_COOLING_HPP_
