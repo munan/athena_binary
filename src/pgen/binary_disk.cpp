@@ -82,6 +82,8 @@ static Real rsep,uanorm,fanorm;
 static Real x1s,x2s,x3s,x1p,x2p,x3p;
 //cfl number for cooling timestep
 static Real cfl_cool;
+//minimum cooling timestep
+static Real dt_min_cool;
 
 // debug for binary orbit
 static FILE * pf;
@@ -154,6 +156,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   //cfl number for cooling time
   cfl_cool = pin->GetReal("hydro","cfl_cool");
+  //minimum cooling timestep
+  dt_min_cool = pin->GetReal("hydro","dt_min_cool");
 
   // Enroll user-defined physical source terms
   if (qrat != 0.0) EnrollUserExplicitSourceFunction(Binary);
@@ -250,7 +254,7 @@ Real CoolingTimeStep(MeshBlock *pmb)
             - 0.5*( SQR(u(IM1,k,j,i)) + SQR(u(IM2,k,j,i)) + SQR(u(IM3,k,j,i))
                    )/u(IDN,k,j,i);
           Edot = pmb->pscalars->chemnet.Edot(time, y, E);
-          dt = std::abs(E) / ( std::abs(Edot)+small_ ) + small_;
+          dt = std::max( std::abs(E) / ( std::abs(Edot)+small_ ), dt_min_cool );
           min_dt = std::min(min_dt, dt);
         }
       }
