@@ -47,6 +47,7 @@ ChemNetwork::ChemNetwork(MeshBlock *pmb, ParameterInput *pin) {
   f_lacc_ =  pin->GetReal("problem", "f_lacc");
   T_floor_ =  pin->GetReal("problem", "T_floor");
   tau_floor_ =  pin->GetReal("problem", "tau_floor");
+  Tirr_ceiling_ =  pin->GetOrAddReal("problem", "Tirr_ceiling", 1.0e4);
 
   //calculate viscosity
   const Real omega_cgs = 1. / pmy_mb_->pmy_mesh->punit->code_time_cgs;
@@ -156,7 +157,10 @@ Real ChemNetwork::Edot(const Real t, const Real *y, const Real ED) {
   const Real f_firr = 0.127456; // factor 0.1/0.5**0.35
   const Real flux_irr_p = f_firr * lum_acc_p/( 4.*PI*SQR(rdiskp_cgs_+rsoft_cgs_) );
   const Real flux_irr_s = f_firr * lum_acc_s/( 4.*PI*SQR(rdisks_cgs_+rsoft_cgs_) );
-  const Real flux_irr = flux_irr_p + flux_irr_s;
+  Real flux_irr = flux_irr_p + flux_irr_s;
+  const Real flux_irr_ceiling = Constants::stefan_boltzmann_cgs
+                                  * SQR(Tirr_ceiling_)*SQR(Tirr_ceiling_);
+  flux_irr = std::min(flux_irr_ceiling, flux_irr);
   // calculate dust cooling
   const Real flux_cool = ( Constants::stefan_boltzmann_cgs * SQR(T)*SQR(T)
                            - flux_irr ) / (tau + 1./tau);

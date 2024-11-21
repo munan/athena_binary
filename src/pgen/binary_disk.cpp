@@ -254,14 +254,14 @@ Real CoolingTimeStep(MeshBlock *pmb)
             - 0.5*( SQR(u(IM1,k,j,i)) + SQR(u(IM2,k,j,i)) + SQR(u(IM3,k,j,i))
                    )/u(IDN,k,j,i);
           Edot = pmb->pscalars->chemnet.Edot(time, y, E);
-          dt = std::max( std::abs(E) / ( std::abs(Edot)+small_ ), dt_min_cool );
+          dt = std::max( cfl_cool * std::abs(E) / ( std::abs(Edot)+small_ ), dt_min_cool );
           min_dt = std::min(min_dt, dt);
         }
       }
     }
   }
   delete[] y;
-  return min_dt * cfl_cool;
+  return min_dt;
 }
 
 //----------------------------------------------------------------------------------------

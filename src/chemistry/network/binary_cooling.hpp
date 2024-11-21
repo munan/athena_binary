@@ -52,6 +52,7 @@ class ChemNetwork : public NetworkWrapper {
   Real f_lacc_; // efficiency for accretion luminosity
   Real T_floor_; //temperature floor below which dEdt=0
   Real tau_floor_; //dust optical depth floor
+  Real Tirr_ceiling_; //dust optical depth floor
 
   //variables updated at InitializeNextStep from hydro variable
   Real sigma_;     // surface density in code units
