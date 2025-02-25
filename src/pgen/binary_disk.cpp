@@ -21,6 +21,7 @@
 #include "../athena.hpp"
 #include "../athena_arrays.hpp"
 #include "../bvals/bvals.hpp"
+#include "../chemistry/utils/chemistry_utils.hpp"
 #include "../coordinates/coordinates.hpp"
 #include "../eos/eos.hpp"
 #include "../field/field.hpp"
@@ -68,7 +69,7 @@ static Real hst_accm(MeshBlock *pmb, int iout);
 
 // problem parameters which are useful to make global to this file
 static Real semia,ecc,qrat,mu,incli,argp;
-static Real gm0, rho0, dslope, gamma_gas, iso_cs, nu_iso;
+static Real gm0, rho0, dslope, gamma_gas, iso_cs, nu_iso, muH, T_ceiling;
 static Real dfloor,pfloor;
 static Real rsoft,rsink,rin,rbuf1,rbuf2;
 static Real tsink; // mass removing time scale
@@ -158,6 +159,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   cfl_cool = pin->GetReal("hydro","cfl_cool");
   //minimum cooling timestep
   dt_min_cool = pin->GetReal("hydro","dt_min_cool");
+  //mean molecular weight for calculating temperture
+  muH = pin->GetReal("problem", "muH");
+  // gas temperature ceiling
+  T_ceiling =  pin->GetReal("problem", "T_ceiling");
 
   // Enroll user-defined physical source terms
   if (qrat != 0.0) EnrollUserExplicitSourceFunction(Binary);
@@ -471,6 +476,17 @@ void MeshBlock::UserWorkInLoop(void)
         u_m1 = u_d*w_vx;
         w_vy = (fabs(w_vy) <= vcap) ? w_vy : 0.0;
         u_m2 = u_d*w_vy;
+        // apply temperture ceiling
+        if (NON_BAROTROPIC_EOS) {
+          Real cs_sq_cgs_ceiling = Constants::k_boltzmann_cgs * T_ceiling 
+                                     / (muH * Constants::hydrogen_mass_cgs);
+          Real cs_sq_ceiling = cs_sq_cgs_ceiling 
+                                   / SQR(pmy_mesh->punit->code_velocity_cgs);
+          Real P_ceiling = cs_sq_ceiling * u_d;
+          w_p = (w_p < P_ceiling) ? w_p : P_ceiling;
+          Real ke = 0.5/u_d * (SQR(u_m1) + SQR(u_m2) + SQR(u_m3));
+          u_e = w_p / (gamma_gas - 1.0) + ke;
+        }
       }
     }
   }
