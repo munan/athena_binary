@@ -108,6 +108,22 @@ void ChemNetwork::InitializeNextStep(const int k, const int j, const int i) {
                  / pmy_mb_->pmy_mesh->punit->code_time_cgs;
   mdots_cgs_ = mdots * pmy_mb_->pmy_mesh->punit->code_mass_cgs
                  / pmy_mb_->pmy_mesh->punit->code_time_cgs;
+  // calculate accretion luminosity and irradiation flux
+  const Real lum_acc_p = f_lacc_ * (1./rstar_) * mp_
+                          * SQR(pmy_mb_->pmy_mesh->punit->code_velocity_cgs)
+                          * mdotp_cgs_;
+  const Real lum_acc_s = f_lacc_ * (1./rstar_) * ms_
+                          * SQR(pmy_mb_->pmy_mesh->punit->code_velocity_cgs)
+                          * mdots_cgs_;
+  const Real f_firr = 0.127456; // factor 0.1/0.5**0.35
+  const Real flux_irr_p = f_firr * lum_acc_p/( 4.*PI*SQR(rdiskp_cgs_+rsoft_cgs_) );
+  const Real flux_irr_s = f_firr * lum_acc_s/( 4.*PI*SQR(rdisks_cgs_+rsoft_cgs_) );
+  Real flux_irr = flux_irr_p + flux_irr_s;
+  const Real flux_irr_ceiling = Constants::stefan_boltzmann_cgs
+                                  * SQR(Tirr_ceiling_)*SQR(Tirr_ceiling_);
+  flux_irr_cgs_ = std::min(flux_irr_ceiling, flux_irr);
+  //user variable output for irradiation temperature
+  pmy_mb_->user_out_var(0,k,j,i) = std::pow(flux_irr_cgs_/Constants::stefan_boltzmann_cgs, 0.25);
   return;
 }
 
@@ -147,23 +163,9 @@ Real ChemNetwork::Edot(const Real t, const Real *y, const Real ED) {
     return 0;
   }
   const Real tau = sigma_cgs_ * GetKappa(T) + tau_floor_;
-  // calculate accretion luminosity and irradiation flux
-  const Real lum_acc_p = f_lacc_ * (1./rstar_) * mp_
-                          * SQR(pmy_mb_->pmy_mesh->punit->code_velocity_cgs)
-                          * mdotp_cgs_;
-  const Real lum_acc_s = f_lacc_ * (1./rstar_) * ms_
-                          * SQR(pmy_mb_->pmy_mesh->punit->code_velocity_cgs)
-                          * mdots_cgs_;
-  const Real f_firr = 0.127456; // factor 0.1/0.5**0.35
-  const Real flux_irr_p = f_firr * lum_acc_p/( 4.*PI*SQR(rdiskp_cgs_+rsoft_cgs_) );
-  const Real flux_irr_s = f_firr * lum_acc_s/( 4.*PI*SQR(rdisks_cgs_+rsoft_cgs_) );
-  Real flux_irr = flux_irr_p + flux_irr_s;
-  const Real flux_irr_ceiling = Constants::stefan_boltzmann_cgs
-                                  * SQR(Tirr_ceiling_)*SQR(Tirr_ceiling_);
-  flux_irr = std::min(flux_irr_ceiling, flux_irr);
   // calculate dust cooling
   const Real flux_cool = ( Constants::stefan_boltzmann_cgs * SQR(T)*SQR(T)
-                           - flux_irr ) / (tau + 1./tau);
+                           - flux_irr_cgs_ ) / (tau + 1./tau);
   // return in code units
   const Real dEDdt = - flux_cool / ( pmy_mb_->pmy_mesh->punit->code_energydensity_cgs
                       * pmy_mb_->pmy_mesh->punit->code_length_cgs

@@ -66,5 +66,6 @@ class ChemNetwork : public NetworkWrapper {
   Real mdots_cgs_;  // mass accretion rate for secondary in cgs
   Real mp_;         // mass of primary in code units
   Real ms_;         // mass of secondary in code units
+  Real flux_irr_cgs_; // irradiation heating flux in cgs
 };
 #endif // CHEMISTRY_NETWORK_BINARY_COOLING_HPP_

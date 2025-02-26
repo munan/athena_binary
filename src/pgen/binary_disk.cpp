@@ -198,6 +198,8 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin) {
   // binary star positions
   ruser_meshblock_data[1].NewAthenaArray(3);
   ruser_meshblock_data[2].NewAthenaArray(3);
+  // Tirr, e, de/dt, dt_cool
+  AllocateUserOutputVariables(4);
   return;
 }
 
@@ -261,6 +263,10 @@ Real CoolingTimeStep(MeshBlock *pmb)
           Edot = pmb->pscalars->chemnet.Edot(time, y, E);
           dt = std::max( cfl_cool * std::abs(E) / ( std::abs(Edot)+small_ ), dt_min_cool );
           min_dt = std::min(min_dt, dt);
+          //user variable outputs
+          pmb->user_out_var(1,k,j,i) = E; // internal energy
+          pmb->user_out_var(2,k,j,i) = Edot; // cooling rate
+          pmb->user_out_var(3,k,j,i) = dt; // cooling time
         }
       }
     }
@@ -478,9 +484,9 @@ void MeshBlock::UserWorkInLoop(void)
         u_m2 = u_d*w_vy;
         // apply temperture ceiling
         if (NON_BAROTROPIC_EOS) {
-          Real cs_sq_cgs_ceiling = Constants::k_boltzmann_cgs * T_ceiling 
+          Real cs_sq_cgs_ceiling = Constants::k_boltzmann_cgs * T_ceiling
                                      / (muH * Constants::hydrogen_mass_cgs);
-          Real cs_sq_ceiling = cs_sq_cgs_ceiling 
+          Real cs_sq_ceiling = cs_sq_cgs_ceiling
                                    / SQR(pmy_mesh->punit->code_velocity_cgs);
           Real P_ceiling = cs_sq_ceiling * u_d;
           w_p = (w_p < P_ceiling) ? w_p : P_ceiling;
