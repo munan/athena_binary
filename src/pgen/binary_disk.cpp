@@ -184,6 +184,23 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   // debug binary orbit
   pf = fopen ("binary_orbit.tab","w");
   tstart = torb; //first dump
+
+  //user mesh data
+  AllocateRealUserMeshDataField(3);
+  //accretion mass and rates
+  ruser_mesh_data[0].NewAthenaArray(4);
+  for(int i=0; i<4; i++) {
+    // initialization
+    ruser_mesh_data[0](i) = 0.;
+  }
+  // binary star positions
+  ruser_mesh_data[1].NewAthenaArray(3);
+  ruser_mesh_data[2].NewAthenaArray(3);
+  for(int i=0; i<3; i++) {
+    // initialization
+    ruser_mesh_data[1](i) = 0.;
+    ruser_mesh_data[2](i) = 0.;
+  }
   return;
 }
 
@@ -192,13 +209,15 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 //! \brief Allocate accretion rates array
 //========================================================================================
 void MeshBlock::InitUserMeshBlockData(ParameterInput *pin) {
+  //user meshblock data
   AllocateRealUserMeshBlockDataField(3);
   //accretion mass and rates
   ruser_meshblock_data[0].NewAthenaArray(4);
-  // binary star positions
-  ruser_meshblock_data[1].NewAthenaArray(3);
-  ruser_meshblock_data[2].NewAthenaArray(3);
-  // Tirr, e, de/dt, dt_cool
+  for(int i=0; i<4; i++) {
+    // initialization
+    ruser_meshblock_data[0](i) = 0.;
+  }
+  //TODO(Munan Gong): user output variables for debugging: Tirr, e, de/dt, dt_cool
   AllocateUserOutputVariables(4);
   return;
 }
@@ -260,6 +279,7 @@ Real CoolingTimeStep(MeshBlock *pmb)
           E = u(IEN,k,j,i)
             - 0.5*( SQR(u(IM1,k,j,i)) + SQR(u(IM2,k,j,i)) + SQR(u(IM3,k,j,i))
                    )/u(IDN,k,j,i);
+          pmb->pscalars->chemnet.InitializeNextStep(k,j,i);
           Edot = pmb->pscalars->chemnet.Edot(time, y, E);
           dt = std::max( cfl_cool * std::abs(E) / ( std::abs(Edot)+small_ ), dt_min_cool );
           min_dt = std::min(min_dt, dt);
@@ -389,16 +409,9 @@ void MeshBlock::UserWorkInLoop(void)
     ku += (NGHOST);
   }
 
-  // binary star positions
-  ruser_meshblock_data[1](0) = x1p;
-  ruser_meshblock_data[1](1) = x2p;
-  ruser_meshblock_data[1](2) = x3p;
-  ruser_meshblock_data[2](0) = x1s;
-  ruser_meshblock_data[2](1) = x2s;
-  ruser_meshblock_data[2](2) = x3s;
   // accretion rates
-  Real& accm1 = ruser_meshblock_data[0](0);
-  Real& accm2 = ruser_meshblock_data[0](1);
+  Real& accm1 = pmy_mesh->ruser_mesh_data[0](0);
+  Real& accm2 = pmy_mesh->ruser_mesh_data[0](1);
   Real& accr1 = ruser_meshblock_data[0](2);
   Real& accr2 = ruser_meshblock_data[0](3);
   accr1 = 0.;
@@ -498,6 +511,31 @@ void MeshBlock::UserWorkInLoop(void)
   }
 
 } //end UserWorkInLoop
+
+//========================================================================================
+//! \fn void Mesh::UserWorkInLoop()
+//  \brief Function called once every time step for user-defined work.
+//========================================================================================
+void Mesh::UserWorkInLoop() {
+  // binary star positions
+  ruser_mesh_data[1](0) = x1p;
+  ruser_mesh_data[1](1) = x2p;
+  ruser_mesh_data[1](2) = x3p;
+  ruser_mesh_data[2](0) = x1s;
+  ruser_mesh_data[2](1) = x2s;
+  ruser_mesh_data[2](2) = x3s;
+  // accretion rates
+  Real& accr1_mesh = ruser_mesh_data[0](2);
+  Real& accr2_mesh = ruser_mesh_data[0](3);
+  accr1_mesh = 0.;
+  accr2_mesh = 0.;
+  for (int bn=0; bn<nblocal; bn++) {
+    MeshBlock *pmb = my_blocks(bn);
+    accr1_mesh += pmb->ruser_meshblock_data[0](2);
+    accr2_mesh += pmb->ruser_meshblock_data[0](3);
+  }
+  return;
+}
 
 
 void Mesh::UserWorkAfterLoop(ParameterInput *pin)
@@ -621,7 +659,7 @@ void Binary(MeshBlock *pmb, const Real time, const Real dt,
 
 static Real hst_accm(MeshBlock *pmb, int iout)
 {
-    return pmb->ruser_meshblock_data[0](iout);
+    return pmb->pmy_mesh->ruser_mesh_data[0](iout);
 }
 
 void DiodeInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &a,

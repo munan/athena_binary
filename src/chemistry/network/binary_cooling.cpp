@@ -88,12 +88,12 @@ void ChemNetwork::InitializeNextStep(const int k, const int j, const int i) {
                 * pmy_mb_->pmy_mesh->punit->code_length_cgs;
 
   // distance to binary stars
-  const Real x1p = pmy_mb_->ruser_meshblock_data[1](0);
-  const Real x2p = pmy_mb_->ruser_meshblock_data[1](1);
-  const Real x3p = pmy_mb_->ruser_meshblock_data[1](2);
-  const Real x1s = pmy_mb_->ruser_meshblock_data[2](0);
-  const Real x2s = pmy_mb_->ruser_meshblock_data[2](1);
-  const Real x3s = pmy_mb_->ruser_meshblock_data[2](2);
+  const Real x1p = pmy_mb_->pmy_mesh->ruser_mesh_data[1](0);
+  const Real x2p = pmy_mb_->pmy_mesh->ruser_mesh_data[1](1);
+  const Real x3p = pmy_mb_->pmy_mesh->ruser_mesh_data[1](2);
+  const Real x1s = pmy_mb_->pmy_mesh->ruser_mesh_data[2](0);
+  const Real x2s = pmy_mb_->pmy_mesh->ruser_mesh_data[2](1);
+  const Real x3s = pmy_mb_->pmy_mesh->ruser_mesh_data[2](2);
   const Real x1 = pmy_mb_->pcoord->x1v(i);
   const Real x2 = pmy_mb_->pcoord->x2v(j);
   const Real x3 = pmy_mb_->pcoord->x3v(k);
@@ -102,8 +102,8 @@ void ChemNetwork::InitializeNextStep(const int k, const int j, const int i) {
   rdisks_cgs_ = sqrt(SQR(x1-x1s)+SQR(x2-x2s)+SQR(x3-x3s))
                  * pmy_mb_->pmy_mesh->punit->code_length_cgs;
   // mass accretion rates
-  const Real mdotp = pmy_mb_->ruser_meshblock_data[0](2);
-  const Real mdots = pmy_mb_->ruser_meshblock_data[0](3);
+  const Real mdotp = pmy_mb_->pmy_mesh->ruser_mesh_data[0](2);
+  const Real mdots = pmy_mb_->pmy_mesh->ruser_mesh_data[0](3);
   mdotp_cgs_ = mdotp * pmy_mb_->pmy_mesh->punit->code_mass_cgs
                  / pmy_mb_->pmy_mesh->punit->code_time_cgs;
   mdots_cgs_ = mdots * pmy_mb_->pmy_mesh->punit->code_mass_cgs
