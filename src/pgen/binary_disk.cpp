@@ -534,6 +534,11 @@ void Mesh::UserWorkInLoop() {
     accr1_mesh += pmb->ruser_meshblock_data[0](2);
     accr2_mesh += pmb->ruser_meshblock_data[0](3);
   }
+
+#ifdef MPI_PARALLEL
+  MPI_Allreduce(MPI_IN_PLACE, &accr1_mesh, 1, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE, &accr2_mesh, 1, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
+#endif
   return;
 }
 
