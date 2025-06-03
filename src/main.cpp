@@ -529,9 +529,6 @@ int main(int argc, char *argv[]) {
         pststlist->DoTaskListOneStage(pmesh, stage);
     }
 
-    // DEBUG
-    std::cout << "Calling Mesh::UserWorkInLoop() at cycle " << pmesh->ncycle
-              << " time = " << pmesh->time << std::endl;
     pmesh->UserWorkInLoop();
 
     pmesh->ncycle++;
