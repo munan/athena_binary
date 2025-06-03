@@ -463,10 +463,10 @@ void MeshBlock::UserWorkInLoop(void)
             Real vol = pcoord->GetCellVolume(k,j,i);
             if (radp <= rsink) {
               accm1 += (u_d0-u_d)*vol;
-              accr1 += (u_d0-u_d)*vol/dt;
+              accr1 += 1.;//(u_d0-u_d)*vol/dt;
             } else {
               accm2 += (u_d0-u_d)*vol;
-              accr2 += (u_d0-u_d)*vol/dt;
+              accr2 += 1.;//(u_d0-u_d)*vol/dt;
             }
           }
         }
@@ -509,6 +509,12 @@ void MeshBlock::UserWorkInLoop(void)
       }
     }
   }
+  // debug
+  std::cout << "MeshBlock::UserWorkInLoop: accr1=" << accr1
+            << ", accr2=" << accr2
+            << ", accm1=" << accm1
+            << ", accm2=" << accm2
+            << std::endl;
 
 } //end UserWorkInLoop
 
@@ -530,6 +536,9 @@ void Mesh::UserWorkInLoop() {
   accr1_mesh = 0.;
   accr2_mesh = 0.;
   for (int bn=0; bn<nblocal; bn++) {
+    // debug
+    std:: cout << "Mesh::UserWorkInLoop: bn=" << bn 
+               << ", nblocal=" << nblocal << std::endl;
     MeshBlock *pmb = my_blocks(bn);
     accr1_mesh += pmb->ruser_meshblock_data[0](2);
     accr2_mesh += pmb->ruser_meshblock_data[0](3);
@@ -539,6 +548,9 @@ void Mesh::UserWorkInLoop() {
   MPI_Allreduce(MPI_IN_PLACE, &accr1_mesh, 1, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
   MPI_Allreduce(MPI_IN_PLACE, &accr2_mesh, 1, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
 #endif
+  // debug
+  std::cout << "Mesh::UserWorkInLoop: accr1_mesh = " << accr1_mesh
+            << ", accr2_mesh = " << accr2_mesh << std::endl;
   return;
 }
 
