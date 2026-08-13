@@ -20,7 +20,7 @@
 //! \brief Physical constants defined in c.g.s.
 namespace Constants {
 static const Real grav_const_cgs       = 6.67259e-8;
-static const Real solar_mass_cgs       = 1.9891e+33;
+static const Real solar_mass_cgs       = 1.9884099e33;
 static const Real solar_lum_cgs        = 3.8268e+33;
 static const Real solar_radius_cgs     = 6.9599e+10;
 static const Real yr_cgs               = 3.155815e+7;

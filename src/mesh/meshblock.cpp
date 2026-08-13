@@ -112,22 +112,7 @@ MeshBlock::MeshBlock(int igid, int ilid, LogicalLocation iloc, RegionSize input_
   pbval  = new BoundaryValues(this, input_bcs, pin);
 
   // Coordinates
-  if (std::strcmp(COORDINATE_SYSTEM, "cartesian") == 0) {
-    pcoord = new Cartesian(this, pin, false);
-  } else if (std::strcmp(COORDINATE_SYSTEM, "cylindrical") == 0) {
-    pcoord = new Cylindrical(this, pin, false);
-  } else if (std::strcmp(COORDINATE_SYSTEM, "spherical_polar") == 0) {
-    pcoord = new SphericalPolar(this, pin, false);
-  } else if (std::strcmp(COORDINATE_SYSTEM, "minkowski") == 0) {
-    pcoord = new Minkowski(this, pin, false);
-  } else if (std::strcmp(COORDINATE_SYSTEM, "schwarzschild") == 0) {
-    pcoord = new Schwarzschild(this, pin, false);
-  } else if (std::strcmp(COORDINATE_SYSTEM, "kerr-schild") == 0) {
-    pcoord = new KerrSchild(this, pin, false);
-  } else if (std::strcmp(COORDINATE_SYSTEM, "gr_user") == 0) {
-    pcoord = new GRUser(this, pin, false);
-  }
-
+  pcoord = new Coordinates(this, pin, false);
 
 //=================================================================
 //set the total number of frequency x angles
@@ -140,6 +125,7 @@ MeshBlock::MeshBlock(int igid, int ilid, LogicalLocation iloc, RegionSize input_
     // total number of azimuthal angles covering 0 to pi
     int npsi = pin->GetOrAddInteger("radiation","npsi",0);
     int angle_flag = pin->GetOrAddInteger("radiation","angle_flag",0);
+    int polar_angle = pin->GetOrAddInteger("radiation","polar_angle",0);
     int n_ang=1; // number of angles per octant and number of octant
     int noct=2;
     // calculate total number of angles based on dimensions
@@ -182,6 +168,8 @@ MeshBlock::MeshBlock(int igid, int ilid, LogicalLocation iloc, RegionSize input_
       }
     }
     nfre_ang = n_ang * noct * nfreq;
+    if(polar_angle)
+      nfre_ang = (n_ang * noct + 2) * nfreq;
   }
   //========================================================
   // Reconstruction: constructor may implicitly depend on Coordinates, and PPM variable
@@ -330,22 +318,7 @@ MeshBlock::MeshBlock(int igid, int ilid, Mesh *pm, ParameterInput *pin,
   pbval = new BoundaryValues(this, input_bcs, pin);
 
   // Coordinates
-  if (std::strcmp(COORDINATE_SYSTEM, "cartesian") == 0) {
-    pcoord = new Cartesian(this, pin, false);
-  } else if (std::strcmp(COORDINATE_SYSTEM, "cylindrical") == 0) {
-    pcoord = new Cylindrical(this, pin, false);
-  } else if (std::strcmp(COORDINATE_SYSTEM, "spherical_polar") == 0) {
-    pcoord = new SphericalPolar(this, pin, false);
-  } else if (std::strcmp(COORDINATE_SYSTEM, "minkowski") == 0) {
-    pcoord = new Minkowski(this, pin, false);
-  } else if (std::strcmp(COORDINATE_SYSTEM, "schwarzschild") == 0) {
-    pcoord = new Schwarzschild(this, pin, false);
-  } else if (std::strcmp(COORDINATE_SYSTEM, "kerr-schild") == 0) {
-    pcoord = new KerrSchild(this, pin, false);
-  } else if (std::strcmp(COORDINATE_SYSTEM, "gr_user") == 0) {
-    pcoord = new GRUser(this, pin, false);
-  }
-
+  pcoord = new Coordinates(this, pin, false);
 
   //======================================================================
   // radiation constructor needs to be done before reconstruction
@@ -360,6 +333,7 @@ MeshBlock::MeshBlock(int igid, int ilid, Mesh *pm, ParameterInput *pin,
     // total number of azimuthal angles covering 0 to pi
     int npsi = pin->GetOrAddInteger("radiation","npsi",0);
     int angle_flag = pin->GetOrAddInteger("radiation","angle_flag",0);
+    int polar_angle = pin->GetOrAddInteger("radiation","polar_angle",0);
     int n_ang=1; // number of angles per octant and number of octant
     int noct=2;
 
@@ -403,6 +377,8 @@ MeshBlock::MeshBlock(int igid, int ilid, Mesh *pm, ParameterInput *pin,
       }
     }
     nfre_ang = n_ang * noct * nfreq;
+    if(polar_angle)
+      nfre_ang = (n_ang * noct + 2) * nfreq;
   }
 
   // Reconstruction (constructor may implicitly depend on Coordinates)
